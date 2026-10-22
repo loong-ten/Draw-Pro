@@ -3,6 +3,8 @@ const MAX_SIDE = 8192;
 const MAX_PIXELS = 32 * 1024 * 1024;
 const HISTORY_BYTES = 96 * 1024 * 1024;
 const HISTORY_COUNT = 30;
+export const BLEND_MODES = ['source-over','multiply','screen','overlay','soft-light','darken','lighten','difference'];
+export const normalizeBlend = value => BLEND_MODES.includes(value) ? value : 'source-over';
 
 export function uid() {
   return globalThis.crypto?.randomUUID?.() ?? `p${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
@@ -41,14 +43,16 @@ export function composite(doc, { background = null } = {}) {
   for (const layer of doc.layers) {
     if (!layer.visible || layer.opacity <= 0) continue;
     context.globalAlpha = layer.opacity;
+    context.globalCompositeOperation = normalizeBlend(layer.blend);
     context.drawImage(layer.canvas, 0, 0);
   }
   context.globalAlpha = 1;
+  context.globalCompositeOperation = 'source-over';
   return output;
 }
 
 function newLayer(width, height, name = '图层 1', canvas = null) {
-  const result = { id: uid(), name, canvas: makeCanvas(width, height), visible: true, opacity: 1, locked: false };
+  const result = { id: uid(), name, canvas: makeCanvas(width, height), visible: true, opacity: 1, locked: false, blend: 'source-over' };
   if (canvas) result.canvas.getContext('2d').drawImage(canvas, 0, 0);
   return result;
 }
@@ -89,7 +93,7 @@ export class PaintDocument {
 
   _capture(label) {
     const layers = this.layers.map(layer => ({
-      id: layer.id, name: layer.name, visible: layer.visible, opacity: layer.opacity, locked: layer.locked,
+      id: layer.id, name: layer.name, visible: layer.visible, opacity: layer.opacity, locked: layer.locked, blend: normalizeBlend(layer.blend),
       pixels: layer.canvas.getContext('2d').getImageData(0, 0, this.width, this.height),
     }));
     return {
@@ -105,7 +109,7 @@ export class PaintDocument {
     this.layers = state.layers.map(saved => {
       const canvas = makeCanvas(state.width, state.height);
       canvas.getContext('2d').putImageData(saved.pixels, 0, 0);
-      return { id: saved.id, name: saved.name, visible: saved.visible, opacity: saved.opacity, locked: saved.locked, canvas };
+      return { id: saved.id, name: saved.name, visible: saved.visible, opacity: saved.opacity, locked: saved.locked, blend: normalizeBlend(saved.blend), canvas };
     });
     this.activeLayerId = state.activeLayerId;
     this.dirty = true;
@@ -144,6 +148,7 @@ export class PaintDocument {
   }
 
   addLayer(name) {
+    if (this.layers.length >= 50) throw new Error('每张图片最多支持 50 个图层。');
     const layer = newLayer(this.width, this.height, name || `图层 ${this.layers.length + 1}`);
     const activeIndex = this.layers.findIndex(item => item.id === this.activeLayerId);
     this.layers.splice(activeIndex < 0 ? this.layers.length : activeIndex + 1, 0, layer);
@@ -178,6 +183,7 @@ export class PaintDocument {
     if (index < 1) return false;
     const upper = this.layers[index];
     const lower = this.layers[index - 1];
+    if (normalizeBlend(upper.blend) !== 'source-over' || normalizeBlend(lower.blend) !== 'source-over') throw new Error('包含混合模式的图层请使用“合并所有可见图层”，以保留最终外观。');
     const canvas = makeCanvas(this.width, this.height);
     const ctx = canvas.getContext('2d');
     if (lower.visible) { ctx.globalAlpha = lower.opacity; ctx.drawImage(lower.canvas, 0, 0); }
@@ -208,6 +214,7 @@ export class PaintDocument {
   setLayer(id, props = {}) {
     const layer = this.layers.find(item => item.id === id);
     if (!layer) return false;
+    if ('blend' in props) layer.blend = normalizeBlend(props.blend);
     if ('name' in props) layer.name = String(props.name).trim() || '图层';
     if ('visible' in props) layer.visible = Boolean(props.visible);
     if ('locked' in props) layer.locked = Boolean(props.locked);

@@ -2,15 +2,22 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <meta name="theme-color" content="#f8f7f4"><meta name="description" content="画境 Paint Studio：多图工作区、图层绘画与共享参考点和参考线。">
-  <title>画境 · Paint Studio</title><link rel="stylesheet" href="./style.css">
+  <meta name="theme-color" content="#1e2228"><meta name="description" content="画境 Pro：融合多图绘画、精修调整、无损拼接与完美像素优化的专业工作台。">
+  <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css">
 </head>
-<body>
+<body data-mode="paint">
   <header class="topbar">
-    <a class="brand" href="#" aria-label="画境主页"><span class="brand-symbol" data-icon="brush"></span><strong>画境</strong><span class="brand-divider"></span><span class="brand-en">PAINT STUDIO</span></a>
-    <div class="top-center"><span class="live-dot"></span> 让每一个像素，各就其位</div>
-    <div class="top-actions"><button class="button quiet" data-action="help" title="快捷键与使用帮助" aria-label="使用帮助"><i data-icon="help"></i></button><button class="button" data-action="folder"><i data-icon="folder"></i><span>打开工作目录</span></button><button class="button primary" data-action="export"><i data-icon="download"></i><span>导出图片</span><i data-icon="chevronDown" class="small"></i></button></div>
+    <a class="brand" href="#" aria-label="画境主页"><span class="brand-symbol" data-icon="brush"></span><strong>画境<span class="pro-badge">PRO</span></strong><span class="brand-divider"></span><span class="brand-en">ART WORKSPACE</span></a>
+    <div class="top-center"><span class="live-dot"></span><button id="workspace-title" title="重命名工作区">我的创作工作区</button><span class="project-type">本地项目</span></div>
+    <div class="top-actions"><button class="button quiet" data-action="help" title="快捷键与使用帮助" aria-label="使用帮助"><i data-icon="help"></i></button><button class="button" data-action="folder"><i data-icon="folder"></i><span>打开工作目录</span></button><button class="button save-project-button" data-action="save-project"><i data-icon="save"></i><span>保存工程</span></button><button class="button primary" data-action="export"><i data-icon="download"></i><span>导出作品</span><i data-icon="chevronDown" class="small"></i></button></div>
   </header>
+  <div class="modebar"><nav class="mode-tabs" role="tablist" aria-label="创作模式">
+    <button class="active" data-mode-switch="paint" role="tab" aria-selected="true"><i data-icon="brush"></i>绘画<span>PAINT</span></button>
+    <button data-mode-switch="retouch" role="tab" aria-selected="false"><i data-icon="contrast"></i>精修<span>RETOUCH</span></button>
+    <button data-mode-switch="compose" role="tab" aria-selected="false"><i data-icon="layers"></i>拼接<span>COMPOSE</span></button>
+    <button data-mode-switch="optimize" role="tab" aria-selected="false"><i data-icon="grid"></i>像素优化<span>PIXEL LAB</span></button>
+    </nav><span id="mode-description">分层绘画 · 多图工作区</span><div class="mode-local"><span class="live-dot"></span>全部本地处理</div>
+  </div>
   <nav class="menubar" aria-label="主菜单">
     <button data-menu="file">文件</button><button data-menu="edit">编辑</button><button data-menu="image">图像</button><button data-menu="view">视图</button><span class="menu-separator"></span>
     <button data-action="undo" title="撤销 Ctrl+Z" aria-label="撤销"><i data-icon="undo"></i></button><button data-action="redo" title="重做 Ctrl+Y" aria-label="重做"><i data-icon="redo"></i></button><span class="menu-separator"></span><button data-action="save" title="保存 Ctrl+S" aria-label="保存"><i data-icon="save"></i></button>
@@ -28,7 +35,7 @@
   <div class="optionsbar"><span class="tool-chip"><i id="current-tool-icon"></i><span id="current-tool-name">画笔</span></span><span class="option-separator"></span><div id="draw-options"><label>大小 <input id="brush-size" type="number" min="1" max="500" value="4" aria-label="画笔大小"> px</label><label>不透明度 <input id="brush-opacity" type="range" min="1" max="100" value="100" aria-label="画笔不透明度"><span id="opacity-value">100%</span></label><label id="tolerance-label" hidden>容差 <input id="tolerance" type="number" min="0" max="255" value="30" aria-label="填充容差"></label></div><div id="text-options" hidden><select id="text-font" aria-label="字体"><option value="Microsoft YaHei, sans-serif">微软雅黑</option><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Georgia</option><option value="monospace">等宽字体</option></select><input id="text-size" type="number" value="32" min="6" max="500" aria-label="字号"><button id="text-bold" title="粗体"><b>B</b></button><button id="text-italic" title="斜体"><em>I</em></button><button id="text-underline" title="下划线"><u>U</u></button><select id="text-align" aria-label="文字对齐"><option value="left">左对齐</option><option value="center">居中</option><option value="right">右对齐</option></select><label><input type="checkbox" id="text-background">背景色</label></div><span id="tool-hint" class="tool-hint">Shift 约束直线 · 空格拖动画布 · 滚轮缩放</span><button class="tiny-button" data-tool="hand" title="平移 H"><i data-icon="hand"></i></button></div>
   <main class="workbench">
     <aside class="assets-panel">
-      <div class="panel-heading"><h2><i data-icon="folder"></i>工作区</h2><button class="icon-button" data-action="new" title="新建画布 Ctrl+N" aria-label="新建画布"><i data-icon="plus"></i></button></div>
+      <div class="panel-heading"><h2><i data-icon="folder"></i>素材工作区</h2><button class="icon-button" data-action="new" title="新建画布 Ctrl+N" aria-label="新建画布"><i data-icon="plus"></i></button></div>
       <button id="directory-button" class="directory-box" data-action="folder"><i data-icon="folderOpen"></i><span><strong id="directory-name">我的创作空间</strong><small id="directory-detail">选择文件夹，开始创作</small></span><i data-icon="chevronDown" class="tiny"></i></button>
       <div class="asset-controls"><span>素材 <b id="asset-count">3</b></span><div><button class="icon-button" id="asset-view" title="切换素材列表" aria-label="切换素材列表"><i data-icon="grid"></i></button><button class="icon-button" data-action="open" title="导入图片" aria-label="导入图片"><i data-icon="plus"></i></button></div></div>
       <div class="asset-search"><i data-icon="search"></i><input id="asset-search" placeholder="搜索素材…" aria-label="搜索素材"></div>
@@ -38,25 +45,39 @@
     </aside>
     <section class="editor-panel">
       <div class="document-bar"><div id="document-tabs" class="document-tabs" role="tablist" aria-label="已打开的图片"></div><button class="icon-button new-tab" data-action="new" title="新建画布" aria-label="新增画布"><i data-icon="plus"></i></button></div>
-      <div id="viewport" tabindex="0" aria-label="画布编辑区域"><canvas id="board" aria-label="绘图画布"></canvas><div class="canvas-caption"><span id="canvas-file-caption">山野之间.png</span><span id="canvas-size-caption">960 × 640 px</span></div><div id="drop-overlay"><i data-icon="upload"></i><strong>放下图片，加入工作区</strong><span>支持多张图片与工作区项目</span></div><div id="text-editor-box" hidden><textarea id="text-editor" placeholder="输入文字…" aria-label="输入画布文字"></textarea><div><button id="text-cancel">取消</button><button id="text-apply">放置文字 ↵</button></div></div></div>
-      <div class="editor-bottom"><span><i data-icon="mouse"></i><span id="interaction-hint">按住空格平移 · 滚轮缩放</span></span><button data-action="fit"><i data-icon="fit"></i>适应窗口</button><button data-action="actual">1:1</button></div>
+      <div id="paint-host"><div class="canvas-toolrail" aria-label="快捷工具">
+       <button data-tool="select" title="矩形选区 M" aria-label="选择工具"><i data-icon="select"></i></button>
+       <button data-tool="lasso" title="自由选区 L" aria-label="自由选区"><i data-icon="lasso"></i></button><span></span>
+       <button data-tool="pencil" title="像素铅笔 P" aria-label="像素铅笔"><i data-icon="pencil"></i></button>
+       <button data-tool="brush" title="画笔 B" aria-label="绘画画笔"><i data-icon="brush"></i></button>
+       <button data-tool="eraser" title="橡皮擦 E" aria-label="擦除工具"><i data-icon="eraser"></i></button>
+       <button data-tool="fill" title="颜色填充 F" aria-label="填色工具"><i data-icon="fill"></i></button>
+       <button data-tool="eyedropper" title="取色器 I" aria-label="取色工具"><i data-icon="eyedropper"></i></button>
+       <button data-tool="text" title="文字 T" aria-label="文字工具"><i data-icon="text"></i></button><span></span>
+       <button data-tool="guide-point" title="共享参考点" aria-label="添加共享参考点"><i data-icon="target"></i></button>
+       <button data-tool="hand" title="平移 H" aria-label="平移画布"><i data-icon="hand"></i></button>
+      </div><div class="canvas-stack">
+      <div id="viewport" tabindex="0" aria-label="画布编辑区域"><canvas id="board" aria-label="绘图画布"></canvas><div class="canvas-caption"><span id="canvas-file-caption">山野之间.png</span><span id="canvas-size-caption">960 × 640 px</span></div><div id="drop-overlay"><i data-icon="upload"></i><strong>放下图片，加入工作区</strong><span>支持多张图片与画境 / 拼境 / Pixelroom 工程</span></div><div id="text-editor-box" hidden><textarea id="text-editor" placeholder="输入文字…" aria-label="输入画布文字"></textarea><div><button id="text-cancel">取消</button><button id="text-apply">放置文字 ↵</button></div></div></div>
+      <div class="editor-bottom"><span><i data-icon="mouse"></i><span id="interaction-hint">按住空格平移 · 滚轮缩放</span></span><button data-action="fit"><i data-icon="fit"></i>适应窗口</button><button data-action="actual">1:1</button></div></div></div>
+      <div id="composer-host" class="mode-host" hidden></div><div id="optimizer-host" class="mode-host" hidden></div>
     </section>
     <aside class="inspector-panel">
-      <div class="inspector-tabs"><button class="active" data-inspector="guides"><i data-icon="guides"></i>共享参考</button><button data-inspector="layers"><i data-icon="layers"></i>图层</button></div>
-      <section id="guides-panel">
+      <div class="inspector-tabs" role="tablist" aria-label="属性面板"><button class="active" data-inspector="layers">图层</button><button data-inspector="guides">参考</button><button data-inspector="adjust">调整</button><button data-inspector="history">历史</button></div>
+      <section id="retouch-panel" hidden></section>
+      <section id="guides-panel" hidden>
         <div class="guide-intro"><span class="intro-icon"><i data-icon="link"></i></span><div><strong>一处放置，全局对齐</strong><p>参考点与参考线在所有素材间共享</p></div></div>
         <div class="guide-toolbar"><button data-tool="guide-point" title="放置参考点"><i data-icon="target"></i>参考点</button><button data-tool="guide-h" title="放置水平参考线"><i data-icon="hline"></i>水平线</button><button data-tool="guide-v" title="放置垂直参考线"><i data-icon="vline"></i>垂直线</button></div>
         <div class="guide-options"><label>定位方式<select id="reference-mode" aria-label="参考定位方式"><option value="pixel">像素坐标</option><option value="relative">相对比例</option></select></label><label class="switch-label"><span>显示参考</span><input id="show-guides" type="checkbox" checked role="switch"></label><label class="switch-label"><span>吸附到参考</span><input id="snap-guides" type="checkbox" checked role="switch"></label></div>
-        <div class="section-heading"><span>工作区参考 <b id="guide-count">3</b></span><button class="icon-button" data-menu="guides" title="参考设置" aria-label="参考设置"><i data-icon="more"></i></button></div>
+        <div class="pixel-view-options"><label><input id="pixel-display" type="checkbox" checked>清晰像素显示</label><label>网格间距<input id="grid-size" type="number" min="1" max="1024" value="1">px</label></div><div class="section-heading"><span>工作区参考 <b id="guide-count">3</b></span><button class="icon-button" data-menu="guides" title="参考设置" aria-label="参考设置"><i data-icon="more"></i></button></div>
         <div id="guide-list" class="guide-list"></div>
         <div class="guide-tip"><i data-icon="info"></i><span>使用参考工具拖动位置，双击列表编辑坐标。锁定可防止误移。</span></div>
       </section>
-      <section id="layers-panel" class="layers-section"><div class="section-heading"><span><i data-icon="layers"></i>图层 <b id="layer-count">3</b></span><div><button class="icon-button" data-menu="layers" title="图层操作" aria-label="图层操作"><i data-icon="more"></i></button><button class="icon-button" data-action="add-layer" title="添加图层" aria-label="添加图层"><i data-icon="plus"></i></button></div></div><div class="layer-opacity"><span>不透明度</span><input id="layer-opacity" type="range" min="0" max="100" value="100" aria-label="图层不透明度"><span id="layer-opacity-label">100%</span></div><div id="layer-list" class="layer-list"></div></section>
+      <section id="layers-panel" class="layers-section"><div class="section-heading"><span><i data-icon="layers"></i>图层 <b id="layer-count">3</b></span><div><button class="icon-button" data-menu="layers" title="图层操作" aria-label="图层操作"><i data-icon="more"></i></button><button class="icon-button" data-action="add-layer" title="添加图层" aria-label="添加图层"><i data-icon="plus"></i></button></div></div><div class="layer-blend"><span>混合模式</span><select id="layer-blend" aria-label="图层混合模式"><option value="source-over">正常</option><option value="multiply">正片叠底</option><option value="screen">滤色</option><option value="overlay">叠加</option><option value="soft-light">柔光</option><option value="darken">变暗</option><option value="lighten">变亮</option><option value="difference">差值</option></select></div><div class="layer-opacity"><span>不透明度</span><input id="layer-opacity" type="range" min="0" max="100" value="100" aria-label="图层不透明度"><span id="layer-opacity-label">100%</span></div><div id="layer-list" class="layer-list"></div><div class="layer-actions"><button data-action="add-layer" title="新建图层"><i data-icon="plus"></i></button><button data-action="duplicate-layer" title="复制图层"><i data-icon="copy"></i></button><button data-action="layer-up" title="上移图层"><i data-icon="chevronUp"></i></button><button data-action="layer-down" title="下移图层"><i data-icon="chevronDown"></i></button><button data-action="delete-layer" title="删除图层"><i data-icon="trash"></i></button></div><div class="layer-next"><span>继续创作</span><button data-mode-switch="retouch"><i data-icon="contrast"></i>精修色彩与像素<i data-icon="chevronRight"></i></button><button data-mode-switch="compose"><i data-icon="layers"></i>加入拼接排版<i data-icon="chevronRight"></i></button><button data-mode-switch="optimize"><i data-icon="grid"></i>像素优化与对比<i data-icon="chevronRight"></i></button></div></section>
       <div class="inspector-footer"><i data-icon="checkCircle"></i>参考辅助不会出现在导出图片中</div>
     </aside>
   </main>
   <footer class="statusbar"><div><span id="coordinate-status"><i data-icon="crosshair"></i> X: — &nbsp; Y: —</span><span class="status-divider"></span><span id="dimension-status">960 × 640 px</span><span id="selection-status"></span></div><div><span id="save-status"><span class="live-dot"></span>示例已就绪</span><span class="status-divider"></span><button data-action="toggle-grid" title="像素网格 Ctrl+'" aria-label="像素网格"><i data-icon="grid"></i></button><button data-action="zoom-out" title="缩小" aria-label="缩小">−</button><input id="zoom-range" type="range" min="-3" max="5" step="0.05" value="0" aria-label="画布缩放"><button data-action="zoom-in" title="放大" aria-label="放大">＋</button><button id="zoom-label" data-action="zoom-dialog">100%</button><button data-action="fullscreen" title="全屏" aria-label="全屏"><i data-icon="fullscreen"></i></button></div></footer>
-  <input id="file-input" type="file" accept="image/*,.paintspace" multiple hidden><input id="directory-input" type="file" accept="image/*" webkitdirectory multiple hidden><input id="project-input" type="file" accept=".paintspace,.json" hidden><input id="guides-input" type="file" accept=".json" hidden><input id="native-color" type="color" hidden>
+  <input id="file-input" type="file" accept="image/*,.paintspace,.pinjing,.pixelroom,.json" multiple hidden><input id="directory-input" type="file" accept="image/*" webkitdirectory multiple hidden><input id="project-input" type="file" accept=".paintspace,.pinjing,.pixelroom,.json" hidden><input id="guides-input" type="file" accept=".json" hidden><input id="native-color" type="color" hidden>
   <div id="popover" class="popover" hidden></div><div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="dialog"><form method="dialog" id="dialog-form"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" id="dialog-close" class="icon-button" aria-label="关闭"><i data-icon="close"></i></button></div><div id="dialog-body"></div><div class="dialog-actions"><button type="button" id="dialog-cancel" class="button">取消</button><button type="submit" id="dialog-submit" class="button primary">确定</button></div></form></dialog>
   <div id="print-view"></div><script type="module" src="./app.js"></script>

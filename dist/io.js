@@ -1,4 +1,5 @@
 import { PaintDocument, makeCanvas, composite } from './core.js';
+import { normalizeBlend } from './core.js';
 
 // All image and project data stays in the browser. A directory is written only
 // after the user explicitly opens it and invokes one of the save functions.
@@ -456,7 +457,7 @@ function validateGuides(input) {
 function validateSettings(input = {}) {
   const result = {};
   // Preserve simple UI preferences without allowing prototype-bearing objects.
-  for (const key of ['referenceMode', 'baseWidth', 'baseHeight', 'activeDocId', 'showGuides', 'snapToGuides', 'showGrid', 'gridSize', 'workspaceName', 'zoom', 'theme']) {
+  for (const key of ['referenceMode', 'baseWidth', 'baseHeight', 'activeDocId', 'showGuides', 'snapToGuides', 'showGrid', 'gridSize', 'workspaceName', 'zoom', 'theme', 'pixelDisplay']) {
     const value = input?.[key];
     if (typeof value === 'boolean' || typeof value === 'string' && value.length < 500 || typeof value === 'number' && Number.isFinite(value)) result[key] = value;
   }
@@ -467,6 +468,11 @@ function validateSettings(input = {}) {
   if (!validHeight) result.baseHeight = 640;
   if (!validWidth || !validHeight) result.referenceMode = 'pixel';
   result.gridSize = typeof result.gridSize === 'number' && Number.isFinite(result.gridSize) && result.gridSize >= 1 && result.gridSize <= 1024 ? Math.round(result.gridSize) : 1;
+  if (input.workbench && typeof input.workbench === 'object' && !Array.isArray(input.workbench)) {
+    const text = JSON.stringify(input.workbench, (key, value) => ['__proto__','prototype','constructor'].includes(key) ? undefined : value);
+    if (text.length > 80 * 1024 * 1024) throw userError('拼接场景与参数超过 80 MB，请精简场景后保存。');
+    result.workbench = JSON.parse(text);
+  }
   return result;
 }
 
@@ -491,7 +497,7 @@ export async function saveWorkspace(docs, guides, settings = {}) {
       activeLayerId: doc.activeLayerId,
       layers: doc.layers.map(layer => ({
         id: layer.id, name: layer.name, visible: layer.visible !== false, opacity: Number.isFinite(layer.opacity) ? layer.opacity : 1,
-        locked: Boolean(layer.locked), data: layer.canvas.toDataURL('image/png'),
+        locked: Boolean(layer.locked), blend: normalizeBlend(layer.blend), data: layer.canvas.toDataURL('image/png'),
       })),
     })),
   };
@@ -548,7 +554,7 @@ export async function loadWorkspace(file) {
       layerIds.add(id);
       layers.push({
         id, name: String(layer.name || `图层 ${index + 1}`).slice(0, 120), canvas,
-        visible: layer.visible !== false, locked: Boolean(layer.locked),
+        visible: layer.visible !== false, locked: Boolean(layer.locked), blend: normalizeBlend(layer.blend),
         opacity: Number.isFinite(layer.opacity) ? Math.min(1, Math.max(0, layer.opacity)) : 1,
       });
     }
@@ -572,7 +578,8 @@ export async function loadWorkspace(file) {
 }
 
 function guidePayload(guides, settings) {
-  return { kind: GUIDE_KIND, version: 1, guides: validateGuides(guides || []), settings: validateSettings(settings) };
+  const { workbench, ...referenceSettings } = settings;
+  return { kind: GUIDE_KIND, version: 1, guides: validateGuides(guides || []), settings: validateSettings(referenceSettings) };
 }
 
 function parseGuidePayload(data) {

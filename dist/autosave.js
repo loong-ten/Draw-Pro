@@ -1,4 +1,4 @@
-import { PaintDocument, makeCanvas, uid } from './core.js';
+import { PaintDocument, makeCanvas, uid, normalizeBlend } from './core.js';
 
 const DATABASE = 'paintstudio-workspace-v1';
 const STORE = 'drafts';
@@ -66,7 +66,7 @@ function plainSettings(settings = {}) {
       if (typeof value === 'number' && !Number.isFinite(value)) return null;
       return value;
     });
-    if (text.length > 256 * 1024) throw new Error('设置数据过大');
+    if (text.length > 80 * 1024 * 1024) throw new Error('设置数据过大');
     copy = JSON.parse(text);
   } catch (error) {
     throw failure('工作区设置无法保存为恢复草稿。', 'DRAFT_INVALID', error);
@@ -154,7 +154,7 @@ export async function saveDraft(docs, guides, settings = {}) {
     layers: doc.layers.map(layer => {
       const snapshot = {
         id: String(layer.id), name: String(layer.name || '图层').slice(0, 120),
-        visible: layer.visible !== false, locked: Boolean(layer.locked),
+        visible: layer.visible !== false, locked: Boolean(layer.locked), blend: normalizeBlend(layer.blend),
         opacity: Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1,
         blob: null,
       };
@@ -165,7 +165,7 @@ export async function saveDraft(docs, guides, settings = {}) {
   }));
   await Promise.all(pending);
   if (currentGeneration !== generation) return { skipped: true };
-  const bytes = documentSnapshots.reduce((sum, doc) => sum + doc.layers.reduce((layerSum, layer) => layerSum + layer.blob.size, 0), 0);
+  const bytes = JSON.stringify(settingsSnapshot).length * 2 + documentSnapshots.reduce((sum, doc) => sum + doc.layers.reduce((layerSum, layer) => layerSum + layer.blob.size, 0), 0);
   if (bytes > MAX_BYTES) throw failure('完整恢复草稿超过 150 MB，未替换上一次草稿。请手动保存并拆分工作区。', 'DRAFT_TOO_LARGE');
   const payload = { kind: 'paintstudio-draft', version: 1, savedAt, bytes, docs: documentSnapshots, guides: guideSnapshot, settings: settingsSnapshot };
   const db = await openDatabase();
@@ -226,7 +226,7 @@ export async function readDraft() {
   validateDocuments(record.docs);
   const guides = copyGuides(record.guides || []);
   const settings = plainSettings(record.settings || {});
-  let bytes = 0;
+  let bytes = JSON.stringify(settings).length * 2;
   for (const doc of record.docs) for (const layer of doc.layers) {
     if (!(layer.blob instanceof Blob)) throw failure('本地恢复草稿缺少图层像素。', 'DRAFT_CORRUPT');
     bytes += layer.blob.size;
@@ -238,7 +238,7 @@ export async function readDraft() {
     for (const layer of saved.layers) {
       layers.push({
         id: String(layer.id || uid()), name: String(layer.name || '图层').slice(0, 120),
-        visible: layer.visible !== false, locked: Boolean(layer.locked),
+        visible: layer.visible !== false, locked: Boolean(layer.locked), blend: normalizeBlend(layer.blend),
         opacity: Number.isFinite(layer.opacity) ? Math.min(1, Math.max(0, layer.opacity)) : 1,
         canvas: await restoreCanvas(layer.blob, saved.width, saved.height),
       });
