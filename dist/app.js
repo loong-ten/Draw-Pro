@@ -6,6 +6,7 @@ import {saveDraft,readDraft,clearDraft} from './autosave.js';
 import {icon,hydrateIcons} from './icons.js';
 import {installWorkbench} from './workbench.js';
 import {importPixelroom} from './inspections.js';
+import {applyOptimizationResult} from './optimization-result.js';
 let workbench = null;
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -171,6 +172,12 @@ function applyLayer(canvas,label,options={}){
   else if(options.hideLayerIds)d.layers.forEach(l=>{if(options.hideLayerIds.includes(l.id))l.visible=false});
   const layer=d.addLayer(label||'优化结果');layer.canvas=cloneCanvas(canvas);d.reorderLayer(layer.id,'top');changed(label||'新增结果图层');return layer;
 }
+function applyOptimizedDocument(target,canvas,label,options={}){
+  if(target===doc()&&(state.gesture||state.selection?.float||state.curve||state.polygon||!$('#text-editor-box').hidden))throw Error('当前素材有未完成的编辑，请完成后重新优化。');
+  const layer=applyOptimizationResult(target,canvas,{...options,documents:state.docs,label});
+  if(target===doc()){state.selection=null;state.lastAction='image';workbench?.deactivate()}
+  state.workspaceDirty=true;renderUI();persist();return layer;
+}
 function commitLayerCanvas(canvas,label){
   const d=doc();if(d.activeLayer.locked)throw Error('当前图层已锁定。');
   if(canvas.width!==d.width||canvas.height!==d.height)throw Error('调整结果尺寸已发生变化，请重新预览。');
@@ -238,7 +245,7 @@ $('#shapes-grid').innerHTML=shapeTools.slice(0,14).map(s=>`<button data-tool="${
 workbench=installWorkbench({
  getDoc:doc,getDocs:()=>state.docs,getState:()=>state,getComposite:cached,getView,viewport,board,
  setView:v=>{Object.assign(getView(),{fit:false},v);requestRender();renderZoom()},
- requestRender,finishPending,refresh:renderUI,invalidate,commit:changed,toast,ask,action,addDocument,applyLayer,commitLayerCanvas,restoreHistory,
+ requestRender,finishPending,refresh:renderUI,invalidate,commit:changed,toast,ask,action,addDocument,applyLayer,applyOptimizedDocument,commitLayerCanvas,restoreHistory,
  setColor:hex=>{if(/^#[0-9a-f]{6}$/i.test(hex)){state.color=hex;renderTools()}},
  persist:()=>{state.workspaceDirty=true;persist()}
 });renderUI();

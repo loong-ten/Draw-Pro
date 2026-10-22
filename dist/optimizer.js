@@ -1,5 +1,6 @@
 import { PaintDocument, makeCanvas, cloneCanvas } from './core.js';
 import { downloadBlob } from './io.js';
+import { snapshotOptimizationTarget, validateOptimizationSource, validateOptimizationTarget } from './optimization-result.js';
 
 const MAX_INPUT_PIXELS = 16_777_216;
 const MAX_EXPORT_PIXELS = 33_554_432;
@@ -74,6 +75,15 @@ function resultToCanvas(result) {
   return canvas;
 }
 
+function mappedResultCanvas(result, width, height, pixels = resultToCanvas(result)) {
+  const canvas = makeCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  const m = result.mapping;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(pixels, m.originX, m.originY, result.width * m.scaleX, result.height * m.scaleY);
+  return canvas;
+}
+
 export function createOptimizer(api, mount) {
   mount.innerHTML = `
     <div class="opt-root">
@@ -89,8 +99,8 @@ export function createOptimizer(api, mount) {
         <section class="opt-section opt-controls"><h3 class="opt-section-title">输入与预设<span class="opt-section-number">01</span></h3><label class="opt-field">优化来源<select data-opt="source"><option value="composite">当前素材 · 可见图层合成</option><option value="layer">当前活动图层 · 原始像素</option></select></label><div class="opt-two"><button class="opt-btn" data-opt-action="preset-original">原像素</button><button class="opt-btn" data-opt-action="preset-user">像素清理</button></div><p class="opt-hint">像素清理：1 px / 主色 / 32 色 / 透明阈值 45 / 去孤点。始终对输入快照处理。</p></section>
         <section class="opt-section opt-controls"><h3 class="opt-section-title">重建像素网格<span class="opt-section-number">02</span></h3><div class="opt-row"><label class="opt-field">单格大小 · px<input data-opt="grid-size" type="number" value="1" min="1" max="64"></label><button class="opt-btn" data-opt-action="analyze" style="margin-top:18px">估计网格</button></div><p class="opt-hint" data-opt="analysis">自动估计仅作建议，请放大核对边缘。</p><div class="opt-row" style="margin-top:11px"><label class="opt-field">水平偏移<input data-opt="offset-x" type="number" min="0" max="0" value="0"></label><label class="opt-field">垂直偏移<input data-opt="offset-y" type="number" min="0" max="0" value="0"></label></div><label class="opt-field" style="margin-top:11px">每格取色<select data-opt="sampling"><option value="nearest">中心取样 · 保留颜色</option><option value="dominant">区域主色 · 去细碎杂色</option><option value="average">透明度加权平均</option></select></label><p class="opt-hint" data-opt="grid-hint">1 × 1 原图像素 → 1 个基础像素</p></section>
         <section class="opt-section opt-controls"><h3 class="opt-section-title">色板与边缘<span class="opt-section-number">03</span></h3><label class="opt-field">最多 RGB 颜色<input data-opt="palette-size" type="number" min="0" max="256" step="1" value="0"><span class="opt-inline-note">0 为不限色 · 不影响保留模式的透明度</span></label><label class="opt-check"><input data-opt="binary" type="checkbox">清理半透明边缘</label><div class="opt-alpha" data-opt="alpha-row" hidden><label class="opt-field">透明阈值 <span data-opt="alpha-label">128</span><input data-opt="alpha-threshold" type="range" min="0" max="255" value="128"></label></div><label class="opt-check"><input data-opt="denoise" type="checkbox">清理单个孤立杂点</label><p class="opt-hint">仅替换与周围 8 个相同邻点不同的单点；可关闭以保留孤立细节。</p><div class="opt-palette" data-opt="palette" aria-label="结果色板"></div></section>
-        <section class="opt-section"><h3 class="opt-section-title">应用与导出<span class="opt-section-number">04</span></h3><div class="opt-buttons-stack"><button class="opt-btn opt-primary opt-wide" data-opt-action="new-document" disabled>创建基础像素素材</button><button class="opt-btn opt-wide" data-opt-action="apply-layer" disabled>按原坐标铺回新图层</button></div><p class="opt-hint">铺回保留原画布尺寸；原图层会隐藏并保留，可在图层面板恢复或撤销。基础素材采用重建后的像素尺寸。</p><div class="opt-row" style="margin-top:11px"><select class="opt-export-select" data-opt="export-scale" aria-label="PNG 导出整数倍率"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select><button class="opt-btn opt-wide" data-opt-action="export" disabled>导出透明 PNG</button></div><p class="opt-hint" data-opt="export-size">最近邻整数放大 · 不导出网格和参考</p></section>
-        <section class="opt-section"><h3 class="opt-section-title">工作区批处理<span class="opt-section-number">05</span></h3><p class="opt-hint" data-opt="batch-scope">将工作区素材逐张优化为新素材，保留全部原图。</p><button class="opt-btn opt-wide" data-opt-action="batch" style="margin-top:10px">批量创建优化素材</button><button class="opt-btn opt-wide opt-batch-cancel" data-opt-action="cancel-batch" style="margin-top:7px" hidden>停止批处理</button><progress class="opt-batch-progress" data-opt="batch-progress" value="0" max="1" hidden></progress><p class="opt-batch-report" data-opt="batch-report" aria-live="polite"></p><p class="opt-hint">使用当前参数和来源方式；按队列逐张处理。单张最多 1677 万像素，工作区最多 100 张。</p></section>
+        <section class="opt-section"><h3 class="opt-section-title">应用与导出<span class="opt-section-number">04</span></h3><div class="opt-buttons-stack"><button class="opt-btn opt-primary opt-wide" data-opt-action="apply-layer" disabled>应用优化</button><button class="opt-btn opt-wide" data-opt-action="new-document" disabled>创建基础像素素材</button></div><p class="opt-hint">应用到当前素材，保留原画布尺寸。结果写入新图层，原图层隐藏保留，可撤销；单图层来源保留原层的顺序、混合模式和不透明度。创建基础像素素材会另存为新素材。</p><div class="opt-row" style="margin-top:11px"><select class="opt-export-select" data-opt="export-scale" aria-label="PNG 导出整数倍率"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select><button class="opt-btn opt-wide" data-opt-action="export" disabled>导出透明 PNG</button></div><p class="opt-hint" data-opt="export-size">最近邻整数放大 · 不导出网格和参考</p></section>
+        <section class="opt-section"><h3 class="opt-section-title">工作区批处理<span class="opt-section-number">05</span></h3><p class="opt-hint" data-opt="batch-scope">按当前参数逐张处理工作区素材。</p><div class="opt-buttons-stack" style="margin-top:10px"><button class="opt-btn opt-primary opt-wide" data-opt-action="batch-apply">工作区批量应用</button><button class="opt-btn opt-wide" data-opt-action="batch">批量创建优化素材</button></div><p class="opt-hint">批量应用更新原素材，保留名称与尺寸；每张图片可分别撤销。批量创建会增加新素材。</p><button class="opt-btn opt-wide opt-batch-cancel" data-opt-action="cancel-batch" style="margin-top:7px" hidden>停止批处理</button><progress class="opt-batch-progress" data-opt="batch-progress" value="0" max="1" hidden></progress><p class="opt-batch-report" data-opt="batch-report" aria-live="polite"></p><p class="opt-hint">使用开始时的参数和来源；修改或关闭的素材会跳过，离开此模式会停止。单张最多 1677 万像素。</p></section>
       </aside>
     </div>`;
   const $ = name => mount.querySelector(`[data-opt="${name}"]`);
@@ -108,9 +118,9 @@ export function createOptimizer(api, mount) {
   function saveSettings() { api.persist?.(); }
   function stale() {
     const d = api.getDoc();
-    return !d || !state.meta || d.id !== state.meta.id || d.revision !== state.meta.revision ||
-      d.width !== state.meta.width || d.height !== state.meta.height ||
-      (state.sourceMode === 'layer' && d.activeLayerId !== state.meta.layerId);
+    if (!d || !state.meta || d.id !== state.meta.id) return true;
+    try { validateOptimizationSource(d, api.getDocs(), state.meta, state.sourceMode); return false; }
+    catch { return true; }
   }
   function ready() { return !!state.result && state.renderedRevision === state.revision && !state.batch; }
   function updateActions() {
@@ -124,10 +134,11 @@ export function createOptimizer(api, mount) {
     button('analyze').disabled = !state.worker || state.analyzing || !!state.batch;
     button('reload').disabled = !!state.batch;
     button('batch').disabled = !!state.batch || !api.getDocs().length;
+    button('batch-apply').disabled = !!state.batch || !api.getDocs().length;
     $('stale').hidden = !state.meta || !stale();
     $('export-size').textContent = state.result ? (withinLimit ? `${w} × ${h} px · ${state.exportScale}× 最近邻 · 透明 PNG` : '导出尺寸超过上限，请降低倍率。') : '最近邻整数放大 · 不导出网格和参考';
     const count = api.getDocs().length;
-    $('batch-scope').textContent = `工作区 ${count} 张素材，按${state.sourceMode === 'layer' ? '各自活动图层' : '可见图层合成'}处理；结果新增为基础像素素材。`;
+    $('batch-scope').textContent = `工作区 ${count} 张素材，按${state.sourceMode === 'layer' ? '各自活动图层' : '可见图层合成'}处理，统一使用当前优化参数。`;
   }
   function status(text, busy = false) {
     $('status').textContent = text;
@@ -230,7 +241,7 @@ export function createOptimizer(api, mount) {
       state.worker = processor(pixels);
       state.source = canvas;
       state.sourcePixels = pixels;
-      state.meta = { id: d.id, revision: d.revision, layerId: d.activeLayerId, width: d.width, height: d.height, name: d.name, layerName: d.activeLayer.name };
+      state.meta = { ...snapshotOptimizationTarget(d), id: d.id, name: d.name, layerName: d.activeLayer.name };
       state.result = null;
       state.resultCanvas = null;
       state.inFlight = false;
@@ -432,15 +443,11 @@ export function createOptimizer(api, mount) {
   function applyLayer() {
     if (!ready() || stale()) { api.toast('当前图像已变更，请先重新读取，再应用优化结果。', true); return; }
     const d = api.getDoc();
-    const canvas = makeCanvas(d.width, d.height);
-    const ctx = canvas.getContext('2d');
-    const m = state.result.mapping;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(state.resultCanvas, m.originX, m.originY, state.result.width * m.scaleX, state.result.height * m.scaleY);
-    const options = state.sourceMode === 'layer' ? { hideLayerIds: [state.meta.layerId] } : { hideOriginals: true };
-    api.applyLayer(canvas, `像素优化 · ${state.options.gridSize}px`, options);
+    validateOptimizationTarget(d, api.getDocs(), state.meta, state.sourceMode);
+    const canvas = mappedResultCanvas(state.result, d.width, d.height, state.resultCanvas);
+    api.applyOptimizedDocument(d, canvas, `应用像素优化 · ${state.options.gridSize}px`, { expected: state.meta, sourceMode: state.sourceMode });
     api.setMode('paint');
-    api.toast('优化结果已放入新图层，源图层已隐藏并保留；可撤销或重新显示。');
+    api.toast('已应用优化：原尺寸不变，原图层已隐藏保留；可撤销或重新显示。');
   }
   async function exportPNG() {
     if (!ready()) return;
@@ -460,11 +467,13 @@ export function createOptimizer(api, mount) {
     downloadBlob(blob, name);
     api.toast(`已生成 ${width} × ${height} 透明 PNG。`);
   }
-  async function batch() {
+  async function batch(mode = 'create') {
     if (state.batch) return;
     api.finishPending();
-    const docs = [...api.getDocs()];
-    if (api.getDocs().length >= 100) throw new Error('工作区已达 100 张，请先关闭部分素材再批处理。');
+    const applyExisting = mode === 'apply';
+    const queue = api.getDocs().map(d => ({ d, expected: snapshotOptimizationTarget(d) }));
+    if (!queue.length) return;
+    if (!applyExisting && api.getDocs().length >= 100) throw new Error('工作区已达 100 张；可使用工作区批量应用，或先关闭部分素材。');
     const options = { ...state.options };
     const sourceMode = state.sourceMode;
     const job = { cancelled: false, worker: null, completed: 0, failures: [], disabledControls: new Map() };
@@ -476,30 +485,36 @@ export function createOptimizer(api, mount) {
     });
     button('cancel-batch').hidden = false;
     $('batch-progress').hidden = false;
-    $('batch-progress').max = docs.length;
+    $('batch-progress').max = queue.length;
     $('batch-progress').value = 0;
-    $('batch-report').textContent = `准备处理 ${docs.length} 张素材…`;
+    $('batch-report').textContent = `准备${applyExisting ? '应用到' : '处理'} ${queue.length} 张素材…`;
     updateActions();
     try {
-      for (let i = 0; i < docs.length; i++) {
+      for (let i = 0; i < queue.length; i++) {
         if (job.cancelled) break;
-        if (api.getDocs().length >= 100) { job.failures.push('已达到 100 张工作区上限，剩余素材未处理。'); break; }
-        const d = docs[i];
-        status(`批量处理 ${i + 1} / ${docs.length}`, true);
-        $('batch-report').textContent = `${i + 1} / ${docs.length} · ${d.name}\n已新增 ${job.completed} 张优化素材`;
+        if (!applyExisting && api.getDocs().length >= 100) { job.stopReason = '已达到 100 张工作区上限'; break; }
+        const { d, expected } = queue[i];
+        status(`批量${applyExisting ? '应用' : '处理'} ${i + 1} / ${queue.length}`, true);
+        $('batch-report').textContent = `${i + 1} / ${queue.length} · ${d.name}\n已${applyExisting ? '应用' : '新增'} ${job.completed} 张素材`;
         try {
           if (d.width * d.height > MAX_INPUT_PIXELS) throw new Error('超过单张 1677 万像素上限');
-          if (!api.getDocs().includes(d)) throw new Error('该素材已关闭或工作区已切换');
+          validateOptimizationSource(d, api.getDocs(), expected, sourceMode);
+          if (applyExisting) validateOptimizationTarget(d, api.getDocs(), expected, sourceMode);
           const source = sourceMode === 'layer' ? d.activeLayer.canvas : api.getComposite(d);
           const image = source.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, source.width, source.height);
           job.worker = processor(image);
           const { result } = await job.worker.run('process', options);
           job.worker.stop(); job.worker = null;
           if (job.cancelled) break;
-          if (!api.getDocs().includes(d)) throw new Error('处理期间素材已关闭或工作区已切换，已跳过结果');
-          const output = new PaintDocument({ canvas: resultToCanvas(result), name: `${baseName(d.name)}-pixel.png` });
-          output.dirty = true;
-          api.addDocument(output, { switchTo: false });
+          validateOptimizationSource(d, api.getDocs(), expected, sourceMode);
+          if (applyExisting) {
+            const canvas = mappedResultCanvas(result, expected.width, expected.height);
+            api.applyOptimizedDocument(d, canvas, `批量应用像素优化 · ${options.gridSize}px`, { expected, sourceMode });
+          } else {
+            const output = new PaintDocument({ canvas: resultToCanvas(result), name: `${baseName(d.name)}-pixel.png` });
+            output.dirty = true;
+            api.addDocument(output, { switchTo: false });
+          }
           job.completed++;
         } catch (error) {
           job.worker?.stop(); job.worker = null;
@@ -516,8 +531,9 @@ export function createOptimizer(api, mount) {
       for (const [control, wasDisabled] of job.disabledControls) control.disabled = wasDisabled;
       syncFields();
       button('cancel-batch').hidden = true;
-      const title = `${job.cancelled ? '已停止' : '处理完成'}：新增 ${job.completed} 张优化素材，原图全部保留。`;
-      $('batch-report').textContent = title + (job.failures.length ? '\n' + job.failures.slice(0, 10).join('\n') + (job.failures.length > 10 ? `\n另有 ${job.failures.length - 10} 项未完成` : '') : '');
+      const remaining = Math.max(0, queue.length - job.completed - job.failures.length);
+      const title = `${job.cancelled ? '已停止' : '处理完成'}：${applyExisting ? '已应用' : '新增'} ${job.completed} 张素材${job.failures.length ? `，跳过 ${job.failures.length} 张` : ''}${remaining ? `，未处理 ${remaining} 张` : ''}。${applyExisting ? '素材数量与尺寸不变，可逐张撤销。' : '原图全部保留。'}`;
+      $('batch-report').textContent = title + (job.stopReason ? '\n' + job.stopReason : '') + (job.failures.length ? '\n' + job.failures.slice(0, 10).join('\n') + (job.failures.length > 10 ? `\n另有 ${job.failures.length - 10} 项未完成` : '') : '');
       status(job.cancelled ? '批处理已停止' : '批处理完成');
       api.persist();
       api.toast(title, job.completed === 0 && job.failures.length > 0);
@@ -534,7 +550,8 @@ export function createOptimizer(api, mount) {
     actual: () => { state.panX = state.panY = 0; zoom(1); },
     grid: () => { state.grid = !state.grid; syncFields(); render(); saveSettings(); },
     background: () => { const modes = ['checker', 'light', 'dark']; state.background = modes[(modes.indexOf(state.background) + 1) % modes.length]; render(); saveSettings(); },
-    'new-document': newDocument, 'apply-layer': applyLayer, export: exportPNG, batch,
+    'new-document': newDocument, 'apply-layer': applyLayer, export: exportPNG,
+    batch: () => batch('create'), 'batch-apply': () => batch('apply'),
     'cancel-batch': () => { if (state.batch) { state.batch.cancelled = true; state.batch.worker?.stop(); } },
   };
   mount.addEventListener('click', event => {
@@ -553,7 +570,7 @@ export function createOptimizer(api, mount) {
   syncFields(); view(state.view); updateActions();
   return {
     activate() { state.active = true; if (!state.source || state.meta?.id !== api.getDoc()?.id) capture(); else { updateActions(); render(); } },
-    deactivate() { state.active = false; state.drag = null; },
+    deactivate() { state.active = false; state.drag = null; if (state.batch) { state.batch.cancelled = true; state.batch.worker?.stop(); } },
     refresh() {
       if (state.capturing) return;
       if (state.active && !state.batch && state.meta?.id !== api.getDoc()?.id) capture();
