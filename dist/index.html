@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <meta name="theme-color" content="#1e2228"><meta name="description" content="画境 Pro：融合多图绘画、精修调整、无损拼接与完美像素优化的专业工作台。">
-  <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css">
+  <meta name="theme-color" content="#1e2228"><meta name="description" content="画境 Pro：融合多图绘画、精修调整、无损拼接、完美像素优化与自动透明扩边的专业工作台。">
+  <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css"><link rel="stylesheet" href="./padding.css">
 </head>
 <body data-mode="paint">
   <header class="topbar">
@@ -16,6 +16,7 @@
     <button data-mode-switch="retouch" role="tab" aria-selected="false"><i data-icon="contrast"></i>精修<span>RETOUCH</span></button>
     <button data-mode-switch="compose" role="tab" aria-selected="false"><i data-icon="layers"></i>拼接<span>COMPOSE</span></button>
     <button data-mode-switch="optimize" role="tab" aria-selected="false"><i data-icon="grid"></i>像素优化<span>PIXEL LAB</span></button>
+    <button data-mode-switch="padding" role="tab" aria-selected="false"><i data-icon="resize"></i>透明扩边<span>PADDING</span></button>
     </nav><span id="mode-description">分层绘画 · 多图工作区</span><div class="mode-local"><span class="live-dot"></span>全部本地处理</div>
   </div>
   <nav class="menubar" aria-label="主菜单">
@@ -59,7 +60,7 @@
       </div><div class="canvas-stack">
       <div id="viewport" tabindex="0" aria-label="画布编辑区域"><canvas id="board" aria-label="绘图画布"></canvas><div class="canvas-caption"><span id="canvas-file-caption">山野之间.png</span><span id="canvas-size-caption">960 × 640 px</span></div><div id="drop-overlay"><i data-icon="upload"></i><strong>放下图片，加入工作区</strong><span>支持多张图片与画境 / 拼境 / Pixelroom 工程</span></div><div id="text-editor-box" hidden><textarea id="text-editor" placeholder="输入文字…" aria-label="输入画布文字"></textarea><div><button id="text-cancel">取消</button><button id="text-apply">放置文字 ↵</button></div></div></div>
       <div class="editor-bottom"><span><i data-icon="mouse"></i><span id="interaction-hint">按住空格平移 · 滚轮缩放</span></span><button data-action="fit"><i data-icon="fit"></i>适应窗口</button><button data-action="actual">1:1</button></div></div></div>
-      <div id="composer-host" class="mode-host" hidden></div><div id="optimizer-host" class="mode-host" hidden></div>
+      <div id="composer-host" class="mode-host" hidden></div><div id="optimizer-host" class="mode-host" hidden></div><div id="padding-host" class="mode-host" hidden></div>
     </section>
     <aside class="inspector-panel">
       <div class="inspector-tabs" role="tablist" aria-label="属性面板"><button class="active" data-inspector="layers">图层</button><button data-inspector="guides">参考</button><button data-inspector="adjust">调整</button><button data-inspector="history">历史</button></div>
@@ -72,7 +73,7 @@
         <div id="guide-list" class="guide-list"></div>
         <div class="guide-tip"><i data-icon="info"></i><span>使用参考工具拖动位置，双击列表编辑坐标。锁定可防止误移。</span></div>
       </section>
-      <section id="layers-panel" class="layers-section"><div class="section-heading"><span><i data-icon="layers"></i>图层 <b id="layer-count">3</b></span><div><button class="icon-button" data-menu="layers" title="图层操作" aria-label="图层操作"><i data-icon="more"></i></button><button class="icon-button" data-action="add-layer" title="添加图层" aria-label="添加图层"><i data-icon="plus"></i></button></div></div><div class="layer-blend"><span>混合模式</span><select id="layer-blend" aria-label="图层混合模式"><option value="source-over">正常</option><option value="multiply">正片叠底</option><option value="screen">滤色</option><option value="overlay">叠加</option><option value="soft-light">柔光</option><option value="darken">变暗</option><option value="lighten">变亮</option><option value="difference">差值</option></select></div><div class="layer-opacity"><span>不透明度</span><input id="layer-opacity" type="range" min="0" max="100" value="100" aria-label="图层不透明度"><span id="layer-opacity-label">100%</span></div><div id="layer-list" class="layer-list"></div><div class="layer-actions"><button data-action="add-layer" title="新建图层"><i data-icon="plus"></i></button><button data-action="duplicate-layer" title="复制图层"><i data-icon="copy"></i></button><button data-action="layer-up" title="上移图层"><i data-icon="chevronUp"></i></button><button data-action="layer-down" title="下移图层"><i data-icon="chevronDown"></i></button><button data-action="delete-layer" title="删除图层"><i data-icon="trash"></i></button></div><div class="layer-next"><span>继续创作</span><button data-mode-switch="retouch"><i data-icon="contrast"></i>精修色彩与像素<i data-icon="chevronRight"></i></button><button data-mode-switch="compose"><i data-icon="layers"></i>加入拼接排版<i data-icon="chevronRight"></i></button><button data-mode-switch="optimize"><i data-icon="grid"></i>像素优化与对比<i data-icon="chevronRight"></i></button></div></section>
+      <section id="layers-panel" class="layers-section"><div class="section-heading"><span><i data-icon="layers"></i>图层 <b id="layer-count">3</b></span><div><button class="icon-button" data-menu="layers" title="图层操作" aria-label="图层操作"><i data-icon="more"></i></button><button class="icon-button" data-action="add-layer" title="添加图层" aria-label="添加图层"><i data-icon="plus"></i></button></div></div><div class="layer-blend"><span>混合模式</span><select id="layer-blend" aria-label="图层混合模式"><option value="source-over">正常</option><option value="multiply">正片叠底</option><option value="screen">滤色</option><option value="overlay">叠加</option><option value="soft-light">柔光</option><option value="darken">变暗</option><option value="lighten">变亮</option><option value="difference">差值</option></select></div><div class="layer-opacity"><span>不透明度</span><input id="layer-opacity" type="range" min="0" max="100" value="100" aria-label="图层不透明度"><span id="layer-opacity-label">100%</span></div><div id="layer-list" class="layer-list"></div><div class="layer-actions"><button data-action="add-layer" title="新建图层"><i data-icon="plus"></i></button><button data-action="duplicate-layer" title="复制图层"><i data-icon="copy"></i></button><button data-action="layer-up" title="上移图层"><i data-icon="chevronUp"></i></button><button data-action="layer-down" title="下移图层"><i data-icon="chevronDown"></i></button><button data-action="delete-layer" title="删除图层"><i data-icon="trash"></i></button></div><div class="layer-next"><span>继续创作</span><button data-mode-switch="retouch"><i data-icon="contrast"></i>精修色彩与像素<i data-icon="chevronRight"></i></button><button data-mode-switch="compose"><i data-icon="layers"></i>加入拼接排版<i data-icon="chevronRight"></i></button><button data-mode-switch="optimize"><i data-icon="grid"></i>像素优化与对比<i data-icon="chevronRight"></i></button><button data-mode-switch="padding"><i data-icon="resize"></i>透明扩边与自动居中<i data-icon="chevronRight"></i></button></div></section>
       <div class="inspector-footer"><i data-icon="checkCircle"></i>参考辅助不会出现在导出图片中</div>
     </aside>
   </main>
