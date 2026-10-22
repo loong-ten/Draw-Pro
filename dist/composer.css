@@ -111,6 +111,7 @@
 .cmp-layer-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .cmp-layer-name strong { color: var(--ink, #e9e9f2); font-size: 10px; font-weight: 450; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .cmp-layer-name small { font-size: 9px; color: var(--muted, #a0a4b4); font-variant-numeric: tabular-nums; }
+.cmp-layer-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmp-layer button { min-width: 19px; padding: 2px; min-height: 25px; opacity: .65; }
 .cmp-layer button svg { width: 12px; height: 12px; }
 .cmp-layer.is-selected button, .cmp-layer:hover button { opacity: 1; }
@@ -141,6 +142,31 @@
 .cmp-check { display: flex; align-items: center; gap: 8px; min-height: 24px; color: var(--muted, #a0a4b4); font-size: 10px; cursor: pointer; }
 .cmp-check > input[type="color"] { margin-left: auto; }
 .cmp-small-note { margin: 5px 0 0; font-size: 9px; line-height: 1.65; color: var(--muted, #a0a4b4); opacity: .75; }
+.cmp-assembly > .cmp-section-title { margin-bottom: 7px; }
+.cmp-assembly h3 { display: flex; align-items: center; gap: 6px; }
+.cmp-assembly h3 svg { width: 13px; height: 13px; color: var(--cmp-accent); }
+.cmp-assembly-switches { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.cmp-assembly-switches .cmp-check { gap: 5px; font-size: 9px; }
+.cmp-assembly-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.cmp-assembly-edit button { border-color: var(--line, #353946); font-size: 10px; }
+.cmp-assembly-edit svg { width: 13px; height: 13px; }
+.cmp-assembly-summary { margin: 9px 0 7px; color: var(--muted, #a0a4b4); font-size: 9px; line-height: 1.6; font-variant-numeric: tabular-nums; }
+.cmp-slot-list:empty { display: none; }
+.cmp-slot-list { display: grid; gap: 4px; margin-bottom: 11px; }
+.cmp-slot-row { display: flex; align-items: center; gap: 7px; padding: 5px 7px; min-width: 0; border: 1px solid #78cfe220; border-radius: 5px; background: #78cfe205; }
+.cmp-slot-row > span { display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; border: 1px solid #78cfe260; color: #78cfe2; font-size: 10px; flex-shrink: 0; }
+.cmp-slot-row.is-occupied > span { color: #82dfb7; border-color: #82dfb760; }
+.cmp-slot-row > div { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.cmp-slot-row strong { font-size: 10px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-slot-row small { font-size: 9px; color: var(--muted, #a0a4b4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-slot-row > button { min-width: 0; min-height: 22px; padding: 2px 4px; font-size: 9px; color: var(--cmp-accent); }
+.cmp-attach-label { display: flex; flex-direction: column; gap: 6px; font-size: 10px; color: var(--muted, #a0a4b4); }
+.cmp-attach-status { margin: 7px 0; font-size: 9px; line-height: 1.65; color: var(--muted, #a0a4b4); overflow-wrap: anywhere; }
+.cmp-attach-status.is-replacing { color: #e6bb83; }
+.cmp-attach-actions { display: flex; gap: 4px; }
+.cmp-attach-actions button { font-size: 10px; padding: 5px 7px; }
+.cmp-assembly-help { margin-top: 7px; }
+.cmp-slot-hint { position: absolute; top: 61px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 7px 12px; border: 1px solid #ffd38a50; border-radius: 6px; background: #292319ed; color: #ffd38a; font-size: 11px; box-shadow: 0 4px 20px #0003; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmp-guide-note { margin-bottom: 7px; }
 .cmp-root dialog { padding: 0; max-height: 88vh; overflow: auto; color: var(--ink, #e9e9f2); background: var(--cmp-panel); border: 1px solid var(--line, #353946); border-radius: 12px; box-shadow: 0 24px 100px #0008; }
 .cmp-root dialog::backdrop { background: #070910b3; backdrop-filter: blur(6px); }
