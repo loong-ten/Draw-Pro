@@ -3,6 +3,7 @@ import { createOptimizer } from './optimizer.js';
 import { createInspections } from './inspections.js';
 import { createPadding } from './padding.js';
 import { createConverter } from './converter.js';
+import { installModeOrder } from './mode-order.js';
 
 /** One workspace, one document collection. Mode modules never own a second app. */
 export function installWorkbench(api) {
@@ -93,6 +94,7 @@ export function installWorkbench(api) {
     api.persist();
   }
 
+  installModeOrder($('.mode-tabs'), { toast: api.toast });
   document.querySelectorAll('[data-mode-switch]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.modeSwitch)));
   document.querySelectorAll('[data-inspector]').forEach(button => button.addEventListener('click', () => setInspector(button.dataset.inspector)));
   $('#pixel-display').addEventListener('change', event => {
