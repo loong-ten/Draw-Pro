@@ -12,7 +12,7 @@ export function installWorkbench(api) {
   let switching = false;
   let modeToken = 0;
   let inspector = 'layers';
-  let composer, optimizer, inspections, padding, converter;
+  let composer, tileCanvas, optimizer, inspections, padding, converter;
   const setPreview = canvas => {
     const d = api.getDoc();
     preview = canvas ? { canvas, docId: d.id, layerId: d.activeLayerId, revision: d.revision } : null;
@@ -21,6 +21,7 @@ export function installWorkbench(api) {
   const bridge = { ...api, setPreview, setMode };
   inspections = createInspections(bridge, $('#retouch-panel'));
   composer = createComposer(bridge, $('#composer-host'));
+  tileCanvas = createComposer(bridge, $('#tile-canvas-host'), { canvasMode: true });
   optimizer = createOptimizer(bridge, $('#optimizer-host'));
   padding = createPadding(bridge, $('#padding-host'));
   converter = createConverter(bridge, $('#converter-host'));
@@ -40,13 +41,15 @@ export function installWorkbench(api) {
   }
 
   async function setMode(name, force = false) {
-    if (!['convert', 'paint', 'retouch', 'compose', 'optimize', 'padding'].includes(name)) return;
+    if (!['convert', 'paint', 'retouch', 'compose', 'tile', 'optimize', 'padding'].includes(name)) return;
     if (padding?.isBusy()) { api.toast('透明扩边正在处理，请等待完成；批处理可在扩边面板中停止。'); return; }
+    if (tileCanvas?.isBusy?.()) { api.toast('瓦片正在导出，请等待完成，或在瓦片面板中取消。'); return; }
     if (name === state.mode && !force) return;
     const token = ++modeToken;
     api.finishPending();
     inspections.deactivate();
     composer.deactivate();
+    tileCanvas.deactivate();
     optimizer.deactivate();
     padding.deactivate();
     converter.deactivate();
@@ -61,13 +64,14 @@ export function installWorkbench(api) {
     const painting = name === 'paint' || name === 'retouch';
     $('#paint-host').hidden = !painting;
     $('#composer-host').hidden = name !== 'compose';
+    $('#tile-canvas-host').hidden = name !== 'tile';
     $('#optimizer-host').hidden = name !== 'optimize';
     $('#padding-host').hidden = name !== 'padding';
     $('#converter-host').hidden = name !== 'convert';
     $('.inspector-panel').hidden = !painting;
     $('#mode-description').textContent = {
       convert: '图片像素化 · 实时对比', paint: '分层绘画 · 多图工作区', retouch: '色彩调整 · 像素检查',
-      compose: '无限画布 · 无损拼接', optimize: '网格采样 · 对比优化',
+      compose: '无限画布 · 无损拼接', tile: '固定画布 · 网格布局 · 瓦片分割', optimize: '网格采样 · 对比优化',
       padding: '透明画布 · 自动居中'
     }[name];
     setInspector(name === 'retouch' ? 'adjust' : name === 'paint' ? 'layers' : inspector);
@@ -75,6 +79,7 @@ export function installWorkbench(api) {
     try {
       if (name === 'convert') await converter.activate();
       else if (name === 'compose') await composer.activate();
+      else if (name === 'tile') await tileCanvas.activate();
       else if (name === 'optimize') await optimizer.activate();
       else if (name === 'padding') await padding.activate();
       else {
@@ -120,10 +125,11 @@ export function installWorkbench(api) {
     $('#grid-size').value = state.gridSize || 1;
     if (['paint','retouch'].includes(state.mode) && ['adjust','history','pixel'].includes(inspector)) inspections.activate();
     else inspections.refresh();
-    if (!switching && state.mode === 'compose') {
-      composer.refresh();
-      const h=composer.getHistoryState?.();
-      if(h){document.querySelectorAll('[data-action=undo]').forEach(b=>b.disabled=!h.canUndo);document.querySelectorAll('[data-action=redo]').forEach(b=>b.disabled=!h.canRedo)}
+    if (!switching && ['compose', 'tile'].includes(state.mode)) {
+      const scene = state.mode === 'tile' ? tileCanvas : composer;
+      scene.refresh();
+      const h = scene.getHistoryState?.(), blocked = scene.isBusy?.();
+      if(h){document.querySelectorAll('[data-action=undo]').forEach(b=>b.disabled=!!blocked||!h.canUndo);document.querySelectorAll('[data-action=redo]').forEach(b=>b.disabled=!!blocked||!h.canRedo)}
     }
     if (!switching && state.mode === 'optimize') optimizer.refresh();
     if (!switching && state.mode === 'padding') padding.refresh();
@@ -132,13 +138,15 @@ export function installWorkbench(api) {
 
   function handleAction(name) {
     if (padding.isBusy()) { api.toast('透明扩边正在处理，请等待完成；批处理可在扩边面板中停止。'); return true; }
-    if (['convert', 'compose', 'optimize', 'padding'].includes(state.mode) && name === 'save') return api.action('save-project').then(() => true);
+    if (tileCanvas.isBusy?.() && !['save', 'save-project'].includes(name)) { api.toast('瓦片正在导出，请等待完成，或在瓦片面板中取消。'); return true; }
+    if (['convert', 'compose', 'tile', 'optimize', 'padding'].includes(state.mode) && name === 'save') return api.action('save-project').then(() => true);
+    if (['compose', 'tile'].includes(state.mode) && ['undo','redo','fit','actual','zoom-in','zoom-out','export','flip-h','flip-v','select-all','delete','deselect'].includes(name)) return Promise.resolve((state.mode === 'tile' ? tileCanvas : composer).handleAction(name)).then(() => true);
     if (state.mode === 'convert' && ['fit','actual','zoom-in','zoom-out','export','toggle-grid'].includes(name)) return Promise.resolve(converter.handleAction(name)).then(() => true);
     if (name === 'show-converter') { setMode('convert'); return true; }
-    if (state.mode === 'compose' && ['undo','redo','fit','actual','zoom-in','zoom-out','export','flip-h','flip-v','select-all','delete'].includes(name)) return Promise.resolve(composer.handleAction(name)).then(() => true);
     if (state.mode === 'optimize' && ['fit','actual','zoom-in','zoom-out','export'].includes(name)) return Promise.resolve(optimizer.handleAction?.(name) ?? (name === 'export' ? optimizer.exportResult?.() : undefined)).then(() => true);
     if (state.mode === 'padding' && ['fit','actual','zoom-in','zoom-out','export'].includes(name)) return Promise.resolve(padding.handleAction(name)).then(() => true);
     if (name === 'show-padding') { setMode('padding'); return true; }
+    if (name === 'show-tile') { setMode('tile'); return true; }
     if (name === 'show-adjust') { setMode('retouch'); return true; }
     if (name === 'show-history') { if(!['paint','retouch'].includes(state.mode)) setMode('retouch').then(()=>setInspector('history')); else setInspector('history'); return true; }
     if (name === 'show-pixel') { if(!['paint','retouch'].includes(state.mode)) setMode('retouch').then(()=>setInspector('pixel')); else setInspector('pixel'); return true; }
@@ -152,6 +160,7 @@ export function installWorkbench(api) {
     inspections.deactivate(); preview = null;
     try {
       await composer.restore(saved.composer || null);
+      await tileCanvas.restore(saved.tileCanvas || null);
       await optimizer.restore(saved.optimizer || null);
       await padding.restore(saved.padding || null);
       converter.restore(saved.converter || null);
@@ -164,11 +173,11 @@ export function installWorkbench(api) {
   document.body.dataset.mode = state.mode;
   setInspector('layers');
   return {
-    composer, optimizer, inspections, padding, converter, setMode, setInspector, refresh, restore, handleAction,
+    composer, tileCanvas, optimizer, inspections, padding, converter, setMode, setInspector, refresh, restore, handleAction,
     getPreview: () => preview,
     deactivate: () => { inspections.deactivate(); preview = null; },
     refreshView: () => inspections.refreshView(),
     inspect: point => inspections.inspect(point),
-    serialize: () => ({ version: 1, mode: state.mode, composer: composer.serialize(), optimizer: optimizer.serialize(), padding: padding.serialize(), converter: converter.serialize() }),
+    serialize: () => ({ version: 1, mode: state.mode, composer: composer.serialize(), tileCanvas: tileCanvas.serialize(), optimizer: optimizer.serialize(), padding: padding.serialize(), converter: converter.serialize() }),
   };
 }
