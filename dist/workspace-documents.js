@@ -1,4 +1,4 @@
-import { PaintDocument, uid } from './core.js';
+import { PaintDocument, makeCanvas, uid } from './core.js';
 
 const MAX_SIDE = 8192;
 const MAX_DOCUMENT_PIXELS = 32 * 1024 * 1024;
@@ -27,6 +27,34 @@ function documentPixels(document) {
   }
   if (!layerIds.has(document.activeLayerId)) throw new TypeError('素材的活动图层不存在。');
   return width * height * layers.length;
+}
+
+/** A new editable asset, with independent pixels/history and no source-file binding. */
+export function createDocumentCopy(source, existingDocs, { maxPixels = 128 * 1024 * 1024 } = {}) {
+  if (!existingDocs.includes(source)) throw new Error('素材已关闭，请重新选择。');
+  if (existingDocs.length >= 100) throw new RangeError('工作区最多支持 100 张图片，请先移除部分素材。');
+  const sourcePixels = documentPixels(source);
+  if (existingDocs.reduce((total, item) => total + documentPixels(item), sourcePixels) > maxPixels) {
+    throw new RangeError('创建副本会超过工作区图层像素容量，请先保存并拆分项目。');
+  }
+  const original = String(source.name || '未命名.png');
+  const split = original.lastIndexOf('.');
+  const extension = split > 0 ? original.slice(split) : '.png';
+  const stem = (split > 0 ? original.slice(0, split) : original).replace(/ 副本(?: \d+)?$/, '');
+  const used = new Set(existingDocs.map(item => item.name.toLocaleLowerCase()));
+  let name = `${stem} 副本${extension}`, number = 2;
+  while (used.has(name.toLocaleLowerCase())) name = `${stem} 副本 ${number++}${extension}`;
+  const result = new PaintDocument({ name, width: source.width, height: source.height });
+  result.layers = source.layers.map(layer => {
+    const canvas = makeCanvas(source.width, source.height);
+    canvas.getContext('2d').putImageData(layer.canvas.getContext('2d').getImageData(0, 0, source.width, source.height), 0, 0);
+    return { ...layer, id: uid(), canvas };
+  });
+  const activeIndex = Math.max(0, source.layers.findIndex(layer => layer.id === source.activeLayerId));
+  result.activeLayerId = result.layers[activeIndex].id;
+  result.fileHandle = null; result.path = ''; result.isDemo = false;
+  result.resetHistory('创建素材副本'); result.dirty = true;
+  return result;
 }
 
 /** Validate the whole batch and plan IDs without changing any supplied object. */
