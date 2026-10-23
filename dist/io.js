@@ -468,6 +468,8 @@ function validateSettings(input = {}) {
   if (!validHeight) result.baseHeight = 640;
   if (!validWidth || !validHeight) result.referenceMode = 'pixel';
   result.gridSize = typeof result.gridSize === 'number' && Number.isFinite(result.gridSize) && result.gridSize >= 1 && result.gridSize <= 1024 ? Math.round(result.gridSize) : 1;
+  result.moveAutoSelect = input?.moveAutoSelect === true;
+  result.moveKeepInside = input?.moveKeepInside !== false;
   if (input.workbench && typeof input.workbench === 'object' && !Array.isArray(input.workbench)) {
     const text = JSON.stringify(input.workbench, (key, value) => ['__proto__','prototype','constructor'].includes(key) ? undefined : value);
     if (text.length > 80 * 1024 * 1024) throw userError('拼接场景与参数超过 80 MB，请精简场景后保存。');
