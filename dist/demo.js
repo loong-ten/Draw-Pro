@@ -266,5 +266,5 @@ function colorStudy() {
 }
 
 export function createDemoDocuments() {
-  return [landscape(), botanical(), colorStudy()];
+  return [landscape()];
 }
