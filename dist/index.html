@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#1e2228"><meta name="description" content="画境 Pro：融合多图绘画、精修调整、无损拼接、完美像素优化与自动透明扩边的专业工作台。">
-  <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./composition-slots.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css"><link rel="stylesheet" href="./padding.css">
+  <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./composition-slots.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css"><link rel="stylesheet" href="./padding.css"><link rel="stylesheet" href="./region-capture.css">
 </head>
 <body data-mode="paint">
   <header class="topbar">
@@ -25,7 +25,7 @@
     <span id="workspace-state" class="menubar-state">示例工作区 <span>·</span> 图片仅在本地处理</span>
   </nav>
   <section class="ribbon" aria-label="绘图工具栏">
-    <div class="ribbon-group image-group"><div class="ribbon-buttons"><button class="ribbon-tall" data-tool="select" title="矩形选区 M"><i data-icon="select"></i><span>选择</span></button><div class="ribbon-stack"><button data-action="crop" title="裁剪到选区"><i data-icon="crop"></i>裁剪</button><button data-menu="transform"><i data-icon="rotate"></i>旋转 <i data-icon="chevronDown" class="tiny"></i></button><button data-action="resize"><i data-icon="resize"></i>调整大小</button></div></div><div class="group-label">图像</div></div>
+    <div class="ribbon-group image-group"><div class="ribbon-buttons"><button class="ribbon-tall" data-tool="select" title="矩形选区 M"><i data-icon="select"></i><span>选择</span></button><button class="ribbon-tall" data-tool="capture" title="区域截图 K · 保存为新素材"><i data-icon="capture"></i><span>区域截图</span></button><div class="ribbon-stack"><button data-action="crop" title="裁剪到选区"><i data-icon="crop"></i>裁剪</button><button data-menu="transform"><i data-icon="rotate"></i>旋转 <i data-icon="chevronDown" class="tiny"></i></button><button data-action="resize"><i data-icon="resize"></i>调整大小</button></div></div><div class="group-label">图像</div></div>
     <div class="ribbon-group"><div class="tool-grid"><button data-tool="pencil" title="铅笔 P" aria-label="铅笔"><i data-icon="pencil"></i></button><button data-tool="fill" title="填充 F" aria-label="填充"><i data-icon="fill"></i></button><button data-tool="text" title="文字 T" aria-label="文字"><i data-icon="text"></i></button><button data-tool="eraser" title="橡皮擦 E" aria-label="橡皮擦"><i data-icon="eraser"></i></button><button data-tool="eyedropper" title="取色器 I" aria-label="取色器"><i data-icon="eyedropper"></i></button><button data-tool="zoom" title="放大镜 Z" aria-label="放大镜"><i data-icon="search"></i></button></div><div class="group-label">工具</div></div>
     <div class="ribbon-group"><div class="brush-section"><button class="ribbon-tall active" data-tool="brush" title="画笔 B"><i data-icon="brush"></i><span>画笔</span></button><button class="small-arrow" data-menu="brushes" title="画笔样式" aria-label="画笔样式"><i data-icon="chevronDown"></i></button></div><div class="group-label">笔刷</div></div>
     <div class="ribbon-group shapes-group"><div id="shapes-grid" class="shapes-grid"></div><button class="shape-more" data-menu="moreshapes" title="更多形状" aria-label="更多形状"><i data-icon="chevronDown"></i></button><div class="group-label">形状</div></div>
@@ -48,7 +48,7 @@
       <div class="document-bar"><div id="document-tabs" class="document-tabs" role="tablist" aria-label="已打开的图片"></div><button class="icon-button new-tab" data-action="new" title="新建画布" aria-label="新增画布"><i data-icon="plus"></i></button></div>
       <div id="paint-host"><div class="canvas-toolrail" aria-label="快捷工具">
        <button data-tool="select" title="矩形选区 M" aria-label="选择工具"><i data-icon="select"></i></button>
-       <button data-tool="lasso" title="自由选区 L" aria-label="自由选区"><i data-icon="lasso"></i></button><span></span>
+       <button data-tool="lasso" title="自由选区 L" aria-label="自由选区"><i data-icon="lasso"></i></button><button data-tool="capture" title="区域截图 K" aria-label="区域截图工具"><i data-icon="capture"></i></button><span></span>
        <button data-tool="pencil" title="像素铅笔 P" aria-label="像素铅笔"><i data-icon="pencil"></i></button>
        <button data-tool="brush" title="画笔 B" aria-label="绘画画笔"><i data-icon="brush"></i></button>
        <button data-tool="eraser" title="橡皮擦 E" aria-label="擦除工具"><i data-icon="eraser"></i></button>
@@ -58,7 +58,8 @@
        <button data-tool="guide-point" title="共享参考点" aria-label="添加共享参考点"><i data-icon="target"></i></button>
        <button data-tool="hand" title="平移 H" aria-label="平移画布"><i data-icon="hand"></i></button>
       </div><div class="canvas-stack">
-      <div id="viewport" tabindex="0" aria-label="画布编辑区域"><canvas id="board" aria-label="绘图画布"></canvas><div class="canvas-caption"><span id="canvas-file-caption">山野之间.png</span><span id="canvas-size-caption">960 × 640 px</span></div><div id="drop-overlay"><i data-icon="upload"></i><strong>放下图片，加入工作区</strong><span>支持多张图片与画境 / 拼境 / Pixelroom 工程</span></div><div id="text-editor-box" hidden><textarea id="text-editor" placeholder="输入文字…" aria-label="输入画布文字"></textarea><div><button id="text-cancel">取消</button><button id="text-apply">放置文字 ↵</button></div></div></div>
+      <section id="capture-panel" class="capture-panel" aria-label="区域截图设置" hidden></section>
+      <div id="viewport" tabindex="0" aria-label="画布编辑区域"><canvas id="board" tabindex="0" aria-label="绘图画布"></canvas><div class="canvas-caption"><span id="canvas-file-caption">山野之间.png</span><span id="canvas-size-caption">960 × 640 px</span></div><div id="drop-overlay"><i data-icon="upload"></i><strong>放下图片，加入工作区</strong><span>支持多张图片与画境 / 拼境 / Pixelroom 工程</span></div><div id="text-editor-box" hidden><textarea id="text-editor" placeholder="输入文字…" aria-label="输入画布文字"></textarea><div><button id="text-cancel">取消</button><button id="text-apply">放置文字 ↵</button></div></div></div>
       <div class="editor-bottom"><span><i data-icon="mouse"></i><span id="interaction-hint">按住空格平移 · 滚轮缩放</span></span><button data-action="fit"><i data-icon="fit"></i>适应窗口</button><button data-action="actual">1:1</button></div></div></div>
       <div id="composer-host" class="mode-host" hidden></div><div id="optimizer-host" class="mode-host" hidden></div><div id="padding-host" class="mode-host" hidden></div>
     </section>
