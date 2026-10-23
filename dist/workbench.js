@@ -78,7 +78,7 @@ export function installWorkbench(api) {
     $('#mode-description').textContent = {
       convert: '图片像素化 · 实时对比', paint: '分层绘画 · 多图工作区', retouch: '色彩调整 · 像素检查',
       compose: '无限画布 · 无损拼接', tile: '固定画布 · 网格布局 · 瓦片分割', slice: '自由切线 · 精灵帧 · 独立素材', optimize: '网格采样 · 对比优化',
-      padding: '透明画布 · 自动居中'
+      padding: '透明画布 · 扩边与缩放'
     }[name];
     setInspector(name === 'retouch' ? 'adjust' : name === 'paint' ? 'layers' : inspector);
     switching = true;

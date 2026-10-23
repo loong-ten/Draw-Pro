@@ -56,6 +56,8 @@
 .pad-section h3>b{margin-left:auto;font-size:9px;font-weight:400;color:#7a92b0}
 .pad-mode-switch{margin-bottom:13px}
 .pad-mode-switch button{flex:1;padding:6px 3px;white-space:nowrap}
+.pad-margin-field{margin-top:12px}
+.pad-check input:disabled{cursor:default}
 .pad-ratios{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:0 0 13px}
 .pad-ratios button{min-height:52px;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1px solid #425065;border-radius:5px;background:#202935;color:#91a7c2;font:10px ui-monospace,monospace;padding:5px}
 .pad-ratios i{display:block;width:22px;max-width:24px;max-height:19px;height:auto;aspect-ratio:var(--ratio);border:1px solid currentColor;border-radius:1px}

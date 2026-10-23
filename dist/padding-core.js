@@ -1,4 +1,4 @@
-/* Integer-only geometry for transparent padding. No raster resampling is performed. */
+/* Integer geometry for transparent padding and nearest-neighbor resizing. */
 const MAX_SIDE = 8192;
 const MAX_PIXELS = 32 * 1024 * 1024;
 const MAX_RATIO = 10000;
@@ -43,6 +43,13 @@ function gcd(a, b) {
   return a;
 }
 
+// Python's round uses ties-to-even. Math.round would make e.g. 2.5 into 3,
+// changing a contained sprite's size and its transparent border by one pixel.
+function roundEven(value) {
+  const lower = Math.floor(value);
+  return value - lower === 0.5 ? lower + lower % 2 : Math.round(value);
+}
+
 /**
  * Find the bounding box of every alpha > 0 pixel, including faint edge pixels.
  * x + width and y + height are exclusive right/bottom boundaries.
@@ -70,7 +77,7 @@ export function findAlphaBounds(image) {
 }
 
 /**
- * Plan a canvas expansion without cropping the original canvas.
+ * Plan either a canvas expansion or an explicit resize with optional containment.
  * centerX/Y are source-space coordinates; offsetX/Y move the entire source.
  * A half-pixel center discrepancy is unavoidable for some odd/even dimensions.
  * margin is minimum visible-content whitespace, not extra whitespace per click.
@@ -83,8 +90,36 @@ export function planPadding(source, options = {}) {
   dimensions(sourceWidth, sourceHeight, '原图');
   const bounds = validBounds(source.bounds, sourceWidth, sourceHeight);
   const mode = options.mode ?? 'ratio';
+  if (mode === 'resize') {
+    const width = options.resizeWidth ?? 48;
+    const height = options.resizeHeight ?? 48;
+    dimensions(width, height, '目标');
+    const fit = options.resizeFit ?? 'stretch';
+    if (!['stretch', 'contain'].includes(fit)) {
+      throw new RangeError('缩放方式必须是直接拉伸或保持比例。');
+    }
+    let contentWidth = width, contentHeight = height;
+    if (fit === 'contain') {
+      const scale = Math.min(width / sourceWidth, height / sourceHeight);
+      contentWidth = clamp(roundEven(sourceWidth * scale), 1, width);
+      contentHeight = clamp(roundEven(sourceHeight * scale), 1, height);
+    }
+    const offsetX = Math.floor((width - contentWidth) / 2);
+    const offsetY = Math.floor((height - contentHeight) / 2);
+    return {
+      operation: 'resize', width, height, contentWidth, contentHeight,
+      scaleX: contentWidth / sourceWidth, scaleY: contentHeight / sourceHeight,
+      offsetX, offsetY,
+      left: offsetX, right: width - contentWidth - offsetX,
+      top: offsetY, bottom: height - contentHeight - offsetY,
+      centerX: sourceWidth / 2, centerY: sourceHeight / 2, empty: !bounds,
+      changed: width !== sourceWidth || height !== sourceHeight ||
+        contentWidth !== sourceWidth || contentHeight !== sourceHeight,
+      minWidth: 1, minHeight: 1,
+    };
+  }
   const center = options.center ?? 'content';
-  if (!['ratio', 'scale', 'size'].includes(mode)) throw new RangeError('请选择比例、倍数或指定尺寸扩边模式。');
+  if (!['ratio', 'scale', 'size'].includes(mode)) throw new RangeError('请选择比例、倍数、指定尺寸扩边或宽高缩放模式。');
   if (!['content', 'canvas'].includes(center)) throw new RangeError('居中方式必须是主体中心或画布中心。');
   const margin = integer(options.margin ?? 0, '最少留白', 0, MAX_SIDE);
   const subject = bounds ?? { x: 0, y: 0, width: sourceWidth, height: sourceHeight };
