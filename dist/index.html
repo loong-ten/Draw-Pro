@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <meta name="theme-color" content="#1e2228"><meta name="description" content="画境 Pro：融合多图绘画、区域截图、精修调整、无损拼接、自定义瓦片画布、完美像素优化与自动透明扩边的专业工作台。">
-  <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./composition-slots.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css"><link rel="stylesheet" href="./padding.css"><link rel="stylesheet" href="./tile-canvas.css"><link rel="stylesheet" href="./region-capture.css">
+  <meta name="theme-color" content="#1e2228"><meta name="description" content="画境 Pro：融合图片像素转换、多图绘画、区域截图、精修调整、无损拼接、自定义瓦片画布、完美像素优化与自动透明扩边的专业工作台。">
+  <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./composition-slots.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css"><link rel="stylesheet" href="./padding.css"><link rel="stylesheet" href="./tile-canvas.css"><link rel="stylesheet" href="./converter.css"><link rel="stylesheet" href="./region-capture.css">
 </head>
 <body data-mode="paint">
   <header class="topbar">
@@ -12,6 +12,7 @@
     <div class="top-actions"><button class="button quiet" data-action="help" title="快捷键与使用帮助" aria-label="使用帮助"><i data-icon="help"></i></button><button class="button" data-action="folder"><i data-icon="folder"></i><span>打开工作目录</span></button><button class="button save-project-button" data-action="save-project"><i data-icon="save"></i><span>保存工程</span></button><button class="button primary" data-action="export"><i data-icon="download"></i><span>导出作品</span><i data-icon="chevronDown" class="small"></i></button></div>
   </header>
   <div class="modebar"><nav class="mode-tabs" role="tablist" aria-label="创作模式">
+    <button data-mode-switch="convert" role="tab" aria-selected="false"><i data-icon="grid"></i>像素转换<span>CONVERT</span></button>
     <button class="active" data-mode-switch="paint" role="tab" aria-selected="true"><i data-icon="brush"></i>绘画<span>PAINT</span></button>
     <button data-mode-switch="retouch" role="tab" aria-selected="false"><i data-icon="contrast"></i>精修<span>RETOUCH</span></button>
     <button data-mode-switch="compose" role="tab" aria-selected="false"><i data-icon="layers"></i>拼接<span>COMPOSE</span></button>
@@ -47,6 +48,7 @@
     </aside>
     <section class="editor-panel">
       <div class="document-bar"><div id="document-tabs" class="document-tabs" role="tablist" aria-label="已打开的图片"></div><button class="icon-button new-tab" data-action="new" title="新建画布" aria-label="新增画布"><i data-icon="plus"></i></button></div>
+      <div id="converter-host" class="mode-host" hidden></div>
       <div id="paint-host"><div class="canvas-toolrail" aria-label="快捷工具">
        <button data-tool="select" title="矩形选区 M" aria-label="选择工具"><i data-icon="select"></i></button>
        <button data-tool="lasso" title="自由选区 L" aria-label="自由选区"><i data-icon="lasso"></i></button><button data-tool="capture" title="区域截图 K" aria-label="区域截图工具"><i data-icon="capture"></i></button><span></span>

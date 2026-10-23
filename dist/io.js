@@ -629,12 +629,19 @@ function zipCrc32(bytes) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-/** One download for every open image; ZIP uses standard uncompressed entries. */
-export async function exportAllZip(docs, format = 'png', quality = 0.92) {
-  format = normalizeFormat(format);
-  if (!MIME_TYPES[format]) throw userError('导出格式须为 PNG、JPEG、WebP、BMP 或 GIF。', 'UNSUPPORTED_FORMAT');
-  if (!Array.isArray(docs) || docs.length < 1) throw userError('工作区没有可导出的图片。');
-  if (docs.length > 500) throw userError('一次最多打包 500 张图片。');
+/** Package Blob entries without downloading; input may encode entries lazily. */
+export async function createFileZip(entries, { isCancelled } = {}) {
+  const checkCancelled = () => {
+    if (isCancelled?.()) {
+      const error = userError('打包已取消。', 'EXPORT_CANCELLED');
+      error.name = 'AbortError';
+      error.cancelled = true;
+      throw error;
+    }
+  };
+  checkCancelled();
+  if (!entries || (!entries[Symbol.iterator] && !entries[Symbol.asyncIterator])) throw userError('打包文件列表无效。');
+  if (Array.isArray(entries) && entries.length > 500) throw userError('一次最多打包 500 个文件。');
   const encoder = new TextEncoder();
   const localParts = [];
   const centralParts = [];
@@ -645,17 +652,23 @@ export async function exportAllZip(docs, format = 'png', quality = 0.92) {
   const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >>> 1);
   let localOffset = 0;
   let centralSize = 0;
-  for (const doc of docs) {
-    let filename = withExtension(doc.name, format);
+  let count = 0;
+  for await (const entry of entries) {
+    checkCancelled();
+    if (count >= 500) throw userError('一次最多打包 500 个文件。');
+    if (!entry || !(entry.blob instanceof Blob)) throw userError('打包文件必须包含有效的 Blob。');
+    let filename = safeName(entry.name, '未命名');
     const stem = filename.replace(/\.[^.]+$/, '');
     const extension = filename.slice(stem.length);
     let duplicate = 1;
     while (usedNames.has(filename.toLowerCase())) filename = `${stem} (${duplicate++})${extension}`;
     usedNames.add(filename.toLowerCase());
     const filenameBytes = encoder.encode(filename);
-    const blob = await encodeDocument(doc, format, quality);
-    if (localOffset + blob.size > 300 * 1024 * 1024) throw userError('素材 ZIP 超过 300 MB，请分批导出或直接保存到工作目录。', 'EXPORT_TOO_LARGE');
+    const blob = entry.blob;
+    // Include local/central headers and the closing record in the size budget.
+    if (localOffset + centralSize + blob.size + 76 + filenameBytes.length * 2 + 22 > 300 * 1024 * 1024) throw userError('素材 ZIP 超过 300 MB，请分批导出或直接保存到工作目录。', 'EXPORT_TOO_LARGE');
     const data = new Uint8Array(await blob.arrayBuffer());
+    checkCancelled();
     const crc = zipCrc32(data);
     const local = new Uint8Array(30);
     const localView = new DataView(local.buffer);
@@ -688,15 +701,30 @@ export async function exportAllZip(docs, format = 'png', quality = 0.92) {
     centralParts.push(central, filenameBytes);
     localOffset += local.length + filenameBytes.length + data.length;
     centralSize += central.length + filenameBytes.length;
+    count++;
   }
+  checkCancelled();
+  if (!count) throw userError('没有可打包的文件。');
   const end = new Uint8Array(22);
   const endView = new DataView(end.buffer);
   endView.setUint32(0, 0x06054b50, true);
-  endView.setUint16(8, docs.length, true);
-  endView.setUint16(10, docs.length, true);
+  endView.setUint16(8, count, true);
+  endView.setUint16(10, count, true);
   endView.setUint32(12, centralSize, true);
   endView.setUint32(16, localOffset, true);
-  const zip = new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
+  return new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
+}
+
+/** One download for every open image; ZIP uses standard uncompressed entries. */
+export async function exportAllZip(docs, format = 'png', quality = 0.92) {
+  format = normalizeFormat(format);
+  if (!MIME_TYPES[format]) throw userError('导出格式须为 PNG、JPEG、WebP、BMP 或 GIF。', 'UNSUPPORTED_FORMAT');
+  if (!Array.isArray(docs) || docs.length < 1) throw userError('工作区没有可导出的图片。');
+  if (docs.length > 500) throw userError('一次最多打包 500 张图片。');
+  async function* images() {
+    for (const doc of docs) yield { name: withExtension(doc.name, format), blob: await encodeDocument(doc, format, quality) };
+  }
+  const zip = await createFileZip(images());
   const name = `画境素材-${format.toUpperCase()}.zip`;
   downloadBlob(zip, name);
   return { name, size: zip.size, count: docs.length, format };
