@@ -1,0 +1,382 @@
+/*
+ * Liquid Glass application surfaces.
+ * Settings, results and artwork keep solid, readable surfaces. Only the two
+ * small floating composition toolbars sample the backdrop. Drawing canvases,
+ * palette swatches and source-image pixels are never filtered or recolored.
+ * Layout tracks, responsive breakpoints and hidden states remain owned by the
+ * original mode stylesheets.
+ */
+
+/* Shared material and geometry vocabulary across all creative modes. */
+html[data-lg-theme] :is(.conv-root, .cmp-root, .opt-root, .pad-root, .slice-root, .fine-workbench) {
+  color: var(--lg-ink);
+  background: var(--lg-surface);
+}
+html[data-lg-theme] .cmp-root {
+  --cmp-panel: var(--lg-surface);
+  --cmp-field: var(--lg-surface-inset);
+  --cmp-accent: var(--lg-accent);
+}
+html[data-lg-theme] :is(.conv-settings, .cmp-inspector, .opt-settings, .pad-settings, .slice-settings, .fine-section) {
+  color: var(--lg-ink);
+  background: var(--lg-surface);
+  border-color: var(--lg-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-lg-theme] :is(.conv-section, .cmp-inspector-section, .opt-section, .pad-section, .slice-section, .tc-controls, .tc-section, .fine-section) {
+  border-color: var(--lg-border);
+}
+html[data-lg-theme] :is(.conv-root, .cmp-root, .opt-root, .pad-root, .slice-root, .fine-workbench, .capture-panel, .capture-preview-body) :is(input:not([type="checkbox"], [type="range"], [type="color"], [type="file"]), select, textarea) {
+  background: var(--lg-surface-raised);
+  color: var(--lg-ink);
+  border-color: var(--lg-border);
+  border-radius: var(--lg-radius-control);
+  color-scheme: inherit;
+  box-shadow: inset 0 1px 2px rgb(12 28 47 / 3%);
+}
+html[data-lg-theme] :is(.conv-root, .cmp-root, .opt-root, .pad-root, .slice-root, .fine-workbench, .capture-panel) :is(input, select, button):focus-visible {
+  outline: 2px solid var(--lg-accent);
+  outline-offset: 2px;
+}
+html[data-lg-theme] :is(.conv-root, .cmp-root, .opt-root, .pad-root, .slice-root, .fine-workbench, .capture-panel) :is(input[type="checkbox"], input[type="range"], progress) {
+  accent-color: var(--lg-accent);
+}
+html[data-lg-theme] :is(.conv-btn, .cmp-root :where(button:not(.cmp-slot-marker)), .opt-btn, .pad-btn, .slice-btn, .fine-button, .capture-save, .capture-preview-small, .capture-coordinates > :where(button)) {
+  color: var(--lg-ink);
+  background: var(--lg-surface-raised);
+  border-color: var(--lg-border);
+  border-radius: var(--lg-radius-capsule);
+  box-shadow: inset 0 1px 0 var(--lg-glass-border), 0 1px 2px rgb(12 28 47 / 3%);
+}
+html[data-lg-theme] :is(.conv-btn, .cmp-root :where(button:not(.cmp-slot-marker)), .opt-btn, .pad-btn, .slice-btn, .fine-button, .capture-preview-small, .capture-coordinates > :where(button)):hover:not(:disabled) {
+  color: var(--lg-accent);
+  background: var(--lg-accent-soft);
+  border-color: var(--lg-accent);
+}
+html[data-lg-theme] :is(.conv-segment, .opt-segment, .pad-segment, .pad-mode-switch, .slice-segment) {
+  background: var(--lg-surface-inset);
+  border-color: var(--lg-border);
+  border-radius: var(--lg-radius-capsule);
+  box-shadow: inset 0 1px 2px rgb(12 28 47 / 5%);
+}
+html[data-lg-theme] :is(.conv-segment > button, .opt-segment > .opt-btn, .pad-segment > button, .pad-mode-switch > button, .slice-segment > button, .fine-tabs > button, .cmp-slot-tabs > button) {
+  color: var(--lg-muted);
+  background: transparent;
+  border-radius: var(--lg-radius-capsule);
+  box-shadow: none;
+}
+html[data-lg-theme] :is(.conv-segment > button, .opt-segment > .opt-btn, .pad-segment > button, .pad-mode-switch > button, .slice-segment > button)[aria-pressed="true"],
+html[data-lg-theme] :is(.fine-tabs > button, .cmp-slot-tabs > button)[aria-selected="true"] {
+  color: var(--lg-accent);
+  background: var(--lg-surface-raised);
+  border-color: var(--lg-glass-border);
+  box-shadow: var(--lg-shadow-small), inset 0 1px 0 var(--lg-glass-border);
+}
+html[data-lg-theme] :is(.conv-toolbar, .opt-preview-toolbar, .pad-toolbar, .slice-toolbar, .cmp-topbar, .fine-tabs) {
+  color: var(--lg-ink);
+  background: var(--lg-surface);
+  border-color: var(--lg-border);
+}
+html[data-lg-theme] :is(.conv-toolbar > .conv-btn, .slice-hand)[aria-pressed="true"],
+html[data-lg-theme] :is(.cmp-root button.is-active, .opt-btn.opt-selected, .tc-controls button.tc-active, .pad-ratios button[aria-pressed="true"], .pad-quick button[aria-pressed="true"], .slice-presets button[aria-pressed="true"]) {
+  color: var(--lg-accent);
+  background: var(--lg-accent-soft);
+  border-color: var(--lg-accent);
+}
+
+/* Conversion: calm solid controls and a clearly separated image comparison. */
+html[data-lg-theme] :is(.conv-heading h2, .conv-control-title, .conv-section h3, .conv-check) { color: var(--lg-ink); }
+html[data-lg-theme] :is(.conv-heading p, .conv-eyebrow, .conv-hint, .conv-preview-footer, .conv-preview-footer > span:first-child, .conv-preview-footer > span:last-child, .conv-summary span, .conv-section h3 > b, .conv-section h3 > span, .conv-reset, .conv-range-note, .conv-field, .conv-report, .conv-zoom > span) { color: var(--lg-muted); }
+html[data-lg-theme] .conv-heading h2 { letter-spacing: -.035em; }
+html[data-lg-theme] .conv-badge {
+  color: var(--lg-good);
+  background: var(--lg-good-bg);
+  border-color: var(--lg-good);
+  border-radius: var(--lg-radius-capsule);
+}
+html[data-lg-theme] :is(.conv-summary, .conv-preview-footer) { border-color: var(--lg-border); }
+html[data-lg-theme] .conv-summary strong { color: var(--lg-ink); }
+html[data-lg-theme] .conv-summary strong.conv-accent { color: var(--lg-accent); }
+html[data-lg-theme] .conv-source-chip {
+  color: var(--lg-ink);
+  background: var(--lg-surface-inset);
+  border-color: var(--lg-border);
+  border-radius: var(--lg-radius-control);
+}
+html[data-lg-theme] .conv-dot { background: var(--lg-good); }
+html[data-lg-theme] .conv-control-title > span {
+  color: var(--lg-accent);
+  background: var(--lg-accent-soft);
+  border-color: var(--lg-border);
+  border-radius: var(--lg-radius-capsule);
+}
+html[data-lg-theme] .conv-outline {
+  color: var(--lg-accent);
+  background: var(--lg-accent-soft);
+  border-color: var(--lg-accent);
+}
+html[data-lg-theme] .conv-pane { border-color: var(--lg-border); border-radius: var(--lg-radius-inner); background: var(--lg-preview-bg); }
+html[data-lg-theme] :is(.conv-pane-label span, .conv-pane-label b) {
+  background: var(--lg-overlay-bg);
+  color: var(--lg-overlay-ink);
+  border-color: rgb(255 255 255 / 28%);
+  border-radius: var(--lg-radius-capsule);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-lg-theme] .conv-message {
+  background: var(--lg-surface-raised);
+  color: var(--lg-ink);
+  border-color: var(--lg-border);
+  border-radius: var(--lg-radius-inner);
+  box-shadow: var(--lg-shadow-small);
+}
+html[data-lg-theme] .conv-message.conv-error { color: var(--lg-danger); background: var(--lg-danger-bg); border-color: var(--lg-danger); }
+
+/* Composition: the floating view tools are the material layer above artwork. */
+html[data-lg-theme] :is(.cmp-topbar, .cmp-source-panel, .cmp-status, .cmp-inspector) { background: var(--lg-surface); border-color: var(--lg-border); }
+html[data-lg-theme] .cmp-mode-dot { background: var(--lg-accent); box-shadow: none; border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .cmp-badge { color: var(--lg-muted); border-color: var(--lg-border); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .cmp-separator { background: var(--lg-border); }
+html[data-lg-theme] :is(.cmp-viewtools, .cmp-zoombar) {
+  background: var(--lg-glass-strong);
+  border-color: var(--lg-glass-border);
+  border-radius: var(--lg-radius-capsule);
+  box-shadow: inset 0 1px 0 var(--lg-glass-border), inset 0 -1px 0 rgb(255 255 255 / 8%), var(--lg-shadow);
+  backdrop-filter: var(--lg-backdrop, blur(16px) saturate(1.45));
+  -webkit-backdrop-filter: var(--lg-backdrop, blur(16px) saturate(1.45));
+}
+html[data-lg-theme] :is(.cmp-viewtools button, .cmp-zoombar button) { color: var(--lg-ink); background: transparent; border-color: transparent; box-shadow: none; }
+html[data-lg-theme] .cmp-zoombar .cmp-zoom-value { color: var(--lg-ink); }
+html[data-lg-theme] .cmp-viewport { background-color: var(--lg-preview-bg); }
+html[data-lg-theme] :is(.cmp-canvas-help, .cmp-canvas-help kbd, .cmp-ref-indicator) { color: var(--lg-overlay-ink); }
+html[data-lg-theme] .cmp-canvas-help kbd { border-color: rgb(255 255 255 / 35%); background: var(--lg-overlay-bg); border-radius: 6px; }
+html[data-lg-theme] .cmp-empty-mark { color: var(--lg-overlay-ink); border-color: rgb(255 255 255 / 28%); background: var(--lg-overlay-bg); border-radius: var(--lg-radius-inner); }
+html[data-lg-theme] :is(.cmp-empty h2, .cmp-empty p, .cmp-empty small) { color: var(--lg-overlay-ink); }
+html[data-lg-theme] .cmp-empty h2 { letter-spacing: -.035em; }
+html[data-lg-theme] .cmp-coords { color: var(--lg-muted); opacity: 1; }
+html[data-lg-theme] .cmp-source {
+  background: var(--lg-surface-raised);
+  border-color: var(--lg-border);
+  border-radius: var(--lg-radius-control);
+}
+html[data-lg-theme] .cmp-source > span { color: var(--lg-ink); }
+html[data-lg-theme] .cmp-source.is-selected { background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+html[data-lg-theme] .cmp-source.is-selected > span { color: var(--lg-accent); }
+html[data-lg-theme] .cmp-layer-count { color: var(--lg-muted); background: var(--lg-surface-inset); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .cmp-layer { border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .cmp-layer:hover { background: var(--lg-surface-inset); }
+html[data-lg-theme] .cmp-layer.is-selected { background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+html[data-lg-theme] .cmp-layer > img { background-color: var(--lg-preview-bg); border-color: var(--lg-border); border-radius: 6px; }
+html[data-lg-theme] .cmp-field-grid > label { border-color: var(--lg-border); border-radius: var(--lg-radius-control); background: var(--lg-surface-raised); }
+html[data-lg-theme] .cmp-root .cmp-field-grid > label > input:not([type="checkbox"]):not([type="range"]):not([type="color"]) { background: transparent; border: 0; box-shadow: none; }
+html[data-lg-theme] :is(.cmp-aligns button, .cmp-layouts button, .cmp-flips button, .cmp-assembly-edit button) { color: var(--lg-ink); background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .cmp-root .cmp-text-link { color: var(--lg-muted); background: transparent; border-color: transparent; box-shadow: none; }
+html[data-lg-theme] .cmp-root .cmp-text-link:hover { color: var(--lg-accent); }
+html[data-lg-theme] .cmp-small-note { color: var(--lg-muted); opacity: 1; }
+html[data-lg-theme] :is(.cmp-locked-note, .cmp-attach-status.is-replacing) { color: var(--lg-warning); }
+html[data-lg-theme] .cmp-slot-row { background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .cmp-slot-row > span { color: var(--lg-accent); border-color: var(--lg-accent); }
+html[data-lg-theme] .cmp-slot-row.is-occupied > span { color: var(--lg-good); border-color: var(--lg-good); }
+html[data-lg-theme] .cmp-slot-hint { color: var(--lg-warning); background: var(--lg-warning-bg); border-color: var(--lg-warning); border-radius: var(--lg-radius-capsule); box-shadow: var(--lg-shadow-small); }
+
+/* Composition dialogs and the source-pixel slot editor use solid content. */
+html[data-lg-theme] .cmp-root dialog {
+  background: var(--lg-surface-raised);
+  color: var(--lg-ink);
+  border-color: var(--lg-border);
+  border-radius: var(--lg-radius-panel);
+  box-shadow: var(--lg-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-lg-theme] :is(.cmp-dialog-header, .cmp-dialog-footer, .cmp-slot-point-fields) { border-color: var(--lg-border); }
+html[data-lg-theme] .cmp-root dialog::backdrop { background: rgb(12 20 33 / 38%); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-lg-theme] .cmp-dialog-header h2 { color: var(--lg-ink); letter-spacing: -.035em; }
+html[data-lg-theme] .cmp-export-preview { background-color: var(--lg-preview-bg); border-color: var(--lg-border); border-radius: var(--lg-radius-inner); }
+html[data-lg-theme] .cmp-export-error { color: var(--lg-danger); }
+html[data-lg-theme] .cmp-slot-tabs > button { border-color: var(--lg-border); }
+html[data-lg-theme] .cmp-slot-tab-count { color: var(--lg-muted); opacity: 1; }
+html[data-lg-theme] .cmp-slot-preview { border-color: var(--lg-border); border-radius: var(--lg-radius-inner); background: var(--lg-preview-bg); }
+html[data-lg-theme] :is(.cmp-slot-preview-toolbar, .cmp-slot-preview-caption) { background: var(--lg-surface); border-color: var(--lg-border); color: var(--lg-muted); }
+html[data-lg-theme] :is(.cmp-slot-source-name, .cmp-slot-preview-coordinates, .cmp-slot-zoom, .cmp-slot-preview-toolbar button) { color: var(--lg-ink); }
+html[data-lg-theme] .cmp-slot-source-size { color: var(--lg-muted); }
+html[data-lg-theme] .cmp-slot-preview-scroll { scrollbar-color: var(--lg-border) var(--lg-preview-bg); }
+html[data-lg-theme] .cmp-slot-mode-count { color: var(--lg-accent); background: var(--lg-accent-soft); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .cmp-root .cmp-slot-editor .cmp-slot-list-item { color: var(--lg-ink); background: var(--lg-surface-inset); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .cmp-root .cmp-slot-editor .cmp-slot-list-item.is-selected { color: var(--lg-accent); background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+html[data-lg-theme] .cmp-slot-editor .cmp-slot-list-item > span { color: var(--lg-good); border-color: var(--lg-good); }
+html[data-lg-theme] :is(.cmp-slot-editor .cmp-slot-list-item > small, .cmp-slot-point-heading > span:last-child, .cmp-slot-editor-note) { color: var(--lg-muted); opacity: 1; }
+html[data-lg-theme] .cmp-slot-point-actions > .cmp-slot-delete { color: var(--lg-danger); background: transparent; box-shadow: none; }
+html[data-lg-theme] .cmp-slot-empty-tip { background: var(--lg-surface-inset); color: var(--lg-muted); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .cmp-slot-marker-label { background: var(--lg-overlay-bg); color: var(--lg-overlay-ink); border-radius: 6px; }
+html[data-lg-theme] .cmp-slot-marker.is-dock .cmp-slot-marker-label { color: var(--lg-overlay-ink); }
+
+/* Fixed canvas, frame counts, measurements and export progress. */
+html[data-lg-theme] :is(.tc-heading > span, .tc-note, .tc-measure-points .tc-point-empty, .tc-measure-hint) { color: var(--lg-muted); opacity: 1; }
+html[data-lg-theme] .tc-controls .tc-preset { background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .tc-preset :is(strong, small) { color: var(--lg-ink); }
+html[data-lg-theme] .tc-controls .tc-preset.tc-active { background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+html[data-lg-theme] .tc-controls .tc-preset.tc-active :is(strong, small) { color: var(--lg-accent); }
+html[data-lg-theme] .tc-tile-presets > button { background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .tc-controls .tc-apply { color: var(--lg-accent); background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+html[data-lg-theme] :is(.tc-plan, .tc-measure-summary, .tc-progress) { background: var(--lg-surface-inset); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .tc-plan.tc-plan-over-limit { background: var(--lg-warning-bg); border-color: var(--lg-warning); }
+html[data-lg-theme] .tc-plan-over-limit .tc-plan-grid { color: var(--lg-warning); }
+html[data-lg-theme] .tc-error { color: var(--lg-danger); }
+html[data-lg-theme] .tc-point-one { color: var(--lg-warning); background: var(--lg-warning-bg); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .tc-point-two { color: var(--lg-accent); background: var(--lg-accent-soft); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .tc-controls .tc-export-png { background: var(--lg-surface-raised); color: var(--lg-ink); border-color: var(--lg-border); }
+html[data-lg-theme] .tc-progress-bar::-webkit-progress-bar { background: var(--lg-border); }
+html[data-lg-theme] .tc-progress-bar::-webkit-progress-value { background: var(--lg-accent); }
+html[data-lg-theme] .tc-progress-bar::-moz-progress-bar { background: var(--lg-accent); }
+html[data-lg-theme] .tc-progress-footer > button { color: var(--lg-danger); background: transparent; border-color: transparent; box-shadow: none; }
+
+/* Optimization and retouching: image colors remain the reference surface. */
+html[data-lg-theme] :is(.opt-preview-header, .opt-preview-footer, .opt-preview-stats) { background: var(--lg-surface); border-color: var(--lg-border); }
+html[data-lg-theme] .opt-canvas-area { background: var(--lg-border); }
+html[data-lg-theme] .opt-pane { background: var(--lg-preview-bg); }
+html[data-lg-theme] .opt-label { color: var(--lg-overlay-ink); background: var(--lg-overlay-bg); border-color: rgb(255 255 255 / 28%); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .opt-split::after { color: var(--lg-accent-on); background: var(--lg-accent); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .opt-stage-message { color: var(--lg-ink); background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-inner); box-shadow: var(--lg-shadow-small); }
+html[data-lg-theme] .opt-stale { color: var(--lg-warning); background: var(--lg-warning-bg); border-color: var(--lg-warning); }
+html[data-lg-theme] .opt-hint.opt-warning { color: var(--lg-warning); }
+html[data-lg-theme] .fine-presets button { background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-control); color: var(--lg-ink); }
+html[data-lg-theme] .fine-preset-swatch { border-radius: 6px; }
+html[data-lg-theme] .fine-ghost { color: var(--lg-muted); background: transparent; border-color: transparent; box-shadow: none; }
+html[data-lg-theme] .fine-history-row { color: var(--lg-muted); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .fine-history-row.future { color: var(--lg-muted); opacity: 1; }
+html[data-lg-theme] .fine-history-row:hover { color: var(--lg-ink); background: var(--lg-surface-inset); }
+html[data-lg-theme] .fine-history-row.active { color: var(--lg-accent); background: var(--lg-accent-soft); }
+html[data-lg-theme] .fine-history-row small { color: var(--lg-muted); opacity: 1; }
+html[data-lg-theme] .fine-loupe-wrap { background: var(--lg-preview-bg); border-color: var(--lg-border); border-radius: var(--lg-radius-inner); }
+html[data-lg-theme] .fine-nav-canvas { background: var(--lg-preview-bg); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+
+/* Transparent padding: parameters and tables are paper-like, not blurred. */
+html[data-lg-theme] :is(.pad-heading, .pad-legend, .pad-edges, .pad-batch-details, .pad-summary) { color: var(--lg-muted); background: var(--lg-surface); border-color: var(--lg-border); }
+html[data-lg-theme] :is(.pad-heading h2, .pad-section h3, .pad-check, .pad-detection strong, .pad-summary strong, .pad-edges b) { color: var(--lg-ink); }
+html[data-lg-theme] :is(.pad-eyebrow, .pad-heading p, .pad-legend > small, .pad-summary span, .pad-edges > span:first-child, .pad-edges small, .pad-section h3 > span, .pad-section h3 > b, .pad-field, .pad-inline, .pad-hint, .pad-detection small, .pad-report, .pad-batch-details summary, .pad-batch-details summary > span, .pad-table-wrap th, .pad-table-wrap td, .pad-zoom > span) { color: var(--lg-muted); }
+html[data-lg-theme] .pad-heading h2 { letter-spacing: -.035em; }
+html[data-lg-theme] .pad-auto-badge { color: var(--lg-good); background: var(--lg-good-bg); border-color: var(--lg-good); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .pad-notice { color: var(--lg-good); background: var(--lg-good-bg); border-color: var(--lg-good); }
+html[data-lg-theme] .pad-notice.pad-warning { color: var(--lg-warning); background: var(--lg-warning-bg); border-color: var(--lg-warning); }
+html[data-lg-theme] .pad-stage { background: var(--lg-border); }
+html[data-lg-theme] .pad-pane { background: var(--lg-preview-bg); }
+html[data-lg-theme] :is(.pad-pane-label span, .pad-pane-label b) { color: var(--lg-overlay-ink); background: var(--lg-overlay-bg); border-color: rgb(255 255 255 / 28%); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .pad-stage-error { color: var(--lg-danger); background: var(--lg-danger-bg); border-color: var(--lg-danger); border-radius: var(--lg-radius-inner); box-shadow: var(--lg-shadow-small); }
+html[data-lg-theme] .pad-key { border-color: var(--lg-warning); }
+html[data-lg-theme] .pad-key-source { border-color: var(--lg-accent); }
+html[data-lg-theme] .pad-key-center { border-color: var(--lg-good); }
+html[data-lg-theme] .pad-summary .pad-accent { color: var(--lg-accent); }
+html[data-lg-theme] .pad-ratios button { background: var(--lg-surface-raised); border-color: var(--lg-border); color: var(--lg-ink); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .pad-ratios button[aria-pressed="true"] { color: var(--lg-accent); border-color: var(--lg-accent); background: var(--lg-accent-soft); }
+html[data-lg-theme] .pad-quick button { background: var(--lg-surface-raised); border-color: var(--lg-border); color: var(--lg-ink); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .pad-quick button[aria-pressed="true"] { color: var(--lg-accent); border-color: var(--lg-accent); background: var(--lg-accent-soft); }
+html[data-lg-theme] .pad-detection { background: var(--lg-good-bg); border-color: var(--lg-good); border-radius: var(--lg-radius-inner); }
+html[data-lg-theme] :is(.pad-detection-icon, .pad-detection strong, .pad-detection small) { color: var(--lg-good); }
+html[data-lg-theme] .pad-table-wrap :is(th, td) { border-color: var(--lg-border); }
+html[data-lg-theme] .pad-table-wrap .pad-error-text { color: var(--lg-danger); }
+html[data-lg-theme] .pad-table-wrap .pad-success-text { color: var(--lg-good); }
+html[data-lg-theme] .pad-btn.pad-outline { color: var(--lg-accent); background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+
+/* Slicing: exact pixel previews are separate from the surrounding controls. */
+html[data-lg-theme] :is(.slice-heading h2, .slice-summary strong, .slice-results h3, .slice-section h3, .slice-source > span, .slice-check) { color: var(--lg-ink); }
+html[data-lg-theme] :is(.slice-eyebrow, .slice-heading p, .slice-zoom > span, .slice-statusbar, .slice-statusbar strong, .slice-summary span, .slice-results h3 span, .slice-results header > span, .slice-section h3 > span, .slice-section h3 > b, .slice-text-btn, .slice-hint, .slice-capacity, .slice-axis > label, .slice-axis > label small, .slice-field) { color: var(--lg-muted); }
+html[data-lg-theme] .slice-heading h2 { letter-spacing: -.035em; }
+html[data-lg-theme] .slice-badge { color: var(--lg-good); background: var(--lg-good-bg); border-color: var(--lg-good); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .slice-stage { background: var(--lg-preview-bg); border-color: var(--lg-border); border-radius: var(--lg-radius-inner); }
+html[data-lg-theme] .slice-stage-label :is(span, b) { background: var(--lg-overlay-bg); border-color: rgb(255 255 255 / 28%); color: var(--lg-overlay-ink); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .slice-empty { color: var(--lg-overlay-ink); }
+html[data-lg-theme] .slice-summary { border-color: var(--lg-border); }
+html[data-lg-theme] .slice-summary .slice-accent { color: var(--lg-accent); }
+html[data-lg-theme] .slice-thumbnails { scrollbar-color: var(--lg-border) var(--lg-surface); }
+html[data-lg-theme] .slice-thumbnail { color: var(--lg-ink); background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-inner); }
+html[data-lg-theme] .slice-thumbnail[aria-pressed="true"] { color: var(--lg-accent); background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+html[data-lg-theme] .slice-thumbnail canvas { border-radius: max(0px, calc(var(--lg-radius-inner) - 4px)); }
+html[data-lg-theme] .slice-thumbnail > small { color: var(--lg-muted); }
+html[data-lg-theme] .slice-source { background: var(--lg-surface-inset); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .slice-source i { background: var(--lg-good); }
+html[data-lg-theme] .slice-axis-v { background: var(--lg-warning); }
+html[data-lg-theme] .slice-axis-h { background: var(--lg-good); }
+html[data-lg-theme] .slice-stepper { background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .slice-stepper button { color: var(--lg-ink); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .slice-root .slice-stepper input { background: transparent; color: var(--lg-ink); border-radius: 0; box-shadow: none; }
+html[data-lg-theme] .slice-line-chip { background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .slice-line-chip label > span { color: var(--lg-warning); }
+html[data-lg-theme] .slice-horizontal label > span { color: var(--lg-good); }
+html[data-lg-theme] .slice-root .slice-line-chip input { color: var(--lg-ink); background: transparent; box-shadow: none; }
+html[data-lg-theme] :is(.slice-line-chip small, .slice-line-chip button) { color: var(--lg-muted); }
+html[data-lg-theme] .slice-presets button { background: var(--lg-surface-raised); border-color: var(--lg-border); color: var(--lg-ink); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .slice-presets button[aria-pressed="true"] { color: var(--lg-accent); background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+html[data-lg-theme] .slice-frame-info { color: var(--lg-good); background: var(--lg-good-bg); border-color: var(--lg-good); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .slice-error { color: var(--lg-danger); background: var(--lg-danger-bg); border-color: var(--lg-danger); border-radius: var(--lg-radius-control); }
+html[data-lg-theme] .slice-report { color: var(--lg-good); }
+html[data-lg-theme] .slice-report-error { color: var(--lg-danger); }
+html[data-lg-theme] .slice-cancel { color: var(--lg-danger); background: var(--lg-danger-bg); border-color: var(--lg-danger); }
+
+/* Region capture belongs to the editing controls, not to the image itself. */
+html[data-lg-theme] .capture-panel { background: var(--lg-surface); border-color: var(--lg-border); }
+html[data-lg-theme] .capture-heading strong { color: var(--lg-accent); }
+html[data-lg-theme] :is(.capture-heading > span, .capture-heading > button, .capture-coordinates, .capture-coordinates > span, .capture-name, .capture-open, .capture-note, .capture-preview-body) { color: var(--lg-muted); }
+html[data-lg-theme] .capture-preview { background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-inner); }
+html[data-lg-theme] .capture-preview > span { color: var(--lg-ink); }
+html[data-lg-theme] .capture-preview canvas { border-radius: max(0px, calc(var(--lg-radius-inner) - 5px)); }
+html[data-lg-theme] .capture-result { color: var(--lg-good); }
+html[data-lg-theme] .capture-result > button { color: var(--lg-accent); }
+html[data-lg-theme] #capture-preview-dialog { background: var(--lg-surface-raised); border-color: var(--lg-border); color: var(--lg-ink); border-radius: var(--lg-radius-panel); }
+html[data-lg-theme] .capture-preview-surface { background: var(--lg-preview-bg); border-color: var(--lg-border); border-radius: var(--lg-radius-inner); }
+html[data-lg-theme] .capture-preview-meta { color: var(--lg-accent); }
+
+/* Primary actions use opaque system tint for dependable text contrast. */
+html[data-lg-theme] :is(.conv-primary, .cmp-root .cmp-primary, .tc-controls .tc-export-zip, .opt-primary, .pad-btn.pad-primary, .slice-primary, .fine-primary, .capture-save) {
+  color: var(--lg-accent-on);
+  background: var(--lg-accent);
+  border-color: var(--lg-accent);
+  border-radius: var(--lg-radius-capsule);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 23%), 0 3px 8px rgb(15 47 88 / 12%);
+}
+html[data-lg-theme] :is(.conv-primary, .cmp-root .cmp-primary, .tc-controls .tc-export-zip, .opt-primary, .pad-btn.pad-primary, .slice-primary, .fine-primary, .capture-save):hover:not(:disabled) {
+  color: var(--lg-accent-on);
+  background: var(--lg-accent);
+  border-color: var(--lg-accent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 28%), 0 4px 12px rgb(15 47 88 / 20%);
+}
+html[data-lg-theme] .cmp-root .cmp-primary-soft { color: var(--lg-accent); background: var(--lg-accent-soft); border-color: var(--lg-accent); }
+
+/* No optical filter is a required path to legibility. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-lg-theme] :is(.cmp-viewtools, .cmp-zoombar) { background: var(--lg-surface-raised); border-color: var(--lg-border); }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-lg-theme] :is(.cmp-viewtools, .cmp-zoombar) { background: var(--lg-surface-raised); border-color: var(--lg-border); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+html[data-lg-theme][data-lg-material="solid"] :is(.cmp-viewtools, .cmp-zoombar),
+html[data-lg-theme][data-lg-contrast="more"] :is(.cmp-viewtools, .cmp-zoombar) {
+  background: var(--lg-surface-raised);
+  border-color: var(--lg-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+@media (forced-colors: active) {
+  html[data-lg-theme] :is(.conv-root, .cmp-root, .opt-root, .pad-root, .slice-root, .fine-workbench, .capture-panel, #capture-preview-dialog) {
+    --lg-ink: CanvasText;
+    --lg-muted: CanvasText;
+    --lg-subtle: CanvasText;
+    --lg-accent: Highlight;
+    --lg-accent-on: HighlightText;
+    --lg-accent-soft: Canvas;
+    --lg-border: ButtonBorder;
+    --lg-surface: Canvas;
+    --lg-surface-raised: Canvas;
+    --lg-surface-inset: Canvas;
+    --lg-glass-strong: Canvas;
+    --lg-good: CanvasText;
+    --lg-good-bg: Canvas;
+    --lg-warning: CanvasText;
+    --lg-warning-bg: Canvas;
+    --lg-danger: CanvasText;
+    --lg-danger-bg: Canvas;
+    --lg-backdrop: none;
+  }
+}

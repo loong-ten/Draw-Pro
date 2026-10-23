@@ -1,18 +1,20 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-lg-theme="light" data-lg-preference="system">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#1e2228"><meta name="description" content="画境 Pro：融合图片像素转换、多图绘画、区域截图、精修调整、无损拼接、自定义瓦片画布、自由切图与精灵帧分割、完美像素优化与自动透明扩边的专业工作台。">
+  <script src="./liquid-theme-init.js"></script>
   <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./composition-slots.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css"><link rel="stylesheet" href="./padding.css"><link rel="stylesheet" href="./tile-canvas.css"><link rel="stylesheet" href="./slicer.css"><link rel="stylesheet" href="./converter.css"><link rel="stylesheet" href="./region-capture.css">
   <link rel="stylesheet" href="./mode-order.css">
+  <link rel="stylesheet" href="./liquid-glass.css"><link rel="stylesheet" href="./liquid-modes.css">
 </head>
 <body data-mode="paint">
-  <header class="topbar">
+  <header class="topbar" data-lg-light>
     <a class="brand" href="#" aria-label="画境主页"><span class="brand-symbol" data-icon="brush"></span><strong>画境<span class="pro-badge">PRO</span></strong><span class="brand-divider"></span><span class="brand-en">ART WORKSPACE</span></a>
     <div class="top-center"><span class="live-dot"></span><button id="workspace-title" title="重命名工作区">我的创作工作区</button><span class="project-type">本地项目</span></div>
-    <div class="top-actions"><button class="button quiet" data-action="help" title="快捷键与使用帮助" aria-label="使用帮助"><i data-icon="help"></i></button><button class="button" data-action="folder"><i data-icon="folder"></i><span>打开工作目录</span></button><button class="button save-project-button" data-action="save-project"><i data-icon="save"></i><span>保存工程</span></button><button class="button primary" data-action="export"><i data-icon="download"></i><span>导出作品</span><i data-icon="chevronDown" class="small"></i></button></div>
+    <div class="top-actions"><button class="button lg-appearance-button" id="lg-appearance-toggle" type="button" title="工作台外观 · 跟随系统" aria-label="工作台外观" aria-expanded="false" aria-controls="lg-appearance-panel" aria-haspopup="dialog"><i data-icon="contrast"></i></button><button class="button quiet" data-action="help" title="快捷键与使用帮助" aria-label="使用帮助"><i data-icon="help"></i></button><button class="button" data-action="folder"><i data-icon="folder"></i><span>打开工作目录</span></button><button class="button save-project-button" data-action="save-project"><i data-icon="save"></i><span>保存工程</span></button><button class="button primary" data-action="export"><i data-icon="download"></i><span>导出作品</span><i data-icon="chevronDown" class="small"></i></button></div>
   </header>
-  <div class="modebar"><nav class="mode-tabs" role="tablist" aria-label="创作模式">
+  <div class="modebar" data-lg-light><nav class="mode-tabs" role="tablist" aria-label="创作模式">
     <button data-mode-switch="convert" role="tab" aria-selected="false"><i data-icon="grid"></i>像素转换<span>CONVERT</span></button>
     <button class="active" data-mode-switch="paint" role="tab" aria-selected="true"><i data-icon="brush"></i>绘画<span>PAINT</span></button>
     <button data-mode-switch="retouch" role="tab" aria-selected="false"><i data-icon="contrast"></i>精修<span>RETOUCH</span></button>
@@ -28,7 +30,7 @@
     <button data-action="undo" title="撤销 Ctrl+Z" aria-label="撤销"><i data-icon="undo"></i></button><button data-action="redo" title="重做 Ctrl+Y" aria-label="重做"><i data-icon="redo"></i></button><span class="menu-separator"></span><button data-action="save" title="保存 Ctrl+S" aria-label="保存"><i data-icon="save"></i></button>
     <span id="workspace-state" class="menubar-state">示例工作区 <span>·</span> 图片仅在本地处理</span>
   </nav>
-  <section class="ribbon" aria-label="绘图工具栏">
+  <section class="ribbon" data-lg-light aria-label="绘图工具栏">
     <div class="ribbon-group image-group"><div class="ribbon-buttons"><button class="ribbon-tall" data-tool="move" title="移动图层 V · 拖动当前图层"><i data-icon="move"></i><span>移动图层</span></button><button class="ribbon-tall" data-tool="select" title="矩形选区 M"><i data-icon="select"></i><span>选择</span></button><button class="ribbon-tall" data-tool="capture" title="区域截图 K · 保存为新素材"><i data-icon="capture"></i><span>区域截图</span></button><div class="ribbon-stack"><button data-action="crop" title="裁剪到选区"><i data-icon="crop"></i>裁剪</button><button data-menu="transform"><i data-icon="rotate"></i>旋转 <i data-icon="chevronDown" class="tiny"></i></button><button data-action="resize"><i data-icon="resize"></i>调整大小</button></div></div><div class="group-label">图像</div></div>
     <div class="ribbon-group"><div class="tool-grid"><button data-tool="pencil" title="铅笔 P" aria-label="铅笔"><i data-icon="pencil"></i></button><button data-tool="fill" title="填充 F" aria-label="填充"><i data-icon="fill"></i></button><button data-tool="text" title="文字 T" aria-label="文字"><i data-icon="text"></i></button><button data-tool="eraser" title="橡皮擦 E" aria-label="橡皮擦"><i data-icon="eraser"></i></button><button data-tool="eyedropper" title="取色器 I" aria-label="取色器"><i data-icon="eyedropper"></i></button><button data-tool="zoom" title="放大镜 Z" aria-label="放大镜"><i data-icon="search"></i></button></div><div class="group-label">工具</div></div>
     <div class="ribbon-group"><div class="brush-section"><button class="ribbon-tall active" data-tool="brush" title="画笔 B"><i data-icon="brush"></i><span>画笔</span></button><button class="small-arrow" data-menu="brushes" title="画笔样式" aria-label="画笔样式"><i data-icon="chevronDown"></i></button></div><div class="group-label">笔刷</div></div>
@@ -51,7 +53,7 @@
     <section class="editor-panel">
       <div class="document-bar"><div id="document-tabs" class="document-tabs" role="tablist" aria-label="已打开的图片"></div><button class="icon-button new-tab" data-action="new" title="新建画布" aria-label="新增画布"><i data-icon="plus"></i></button></div>
       <div id="converter-host" class="mode-host" hidden></div>
-      <div id="paint-host"><div class="canvas-toolrail" aria-label="快捷工具">
+      <div id="paint-host"><div class="canvas-toolrail" data-lg-light aria-label="快捷工具">
        <button data-tool="move" title="移动图层 V" aria-label="移动图层工具"><i data-icon="move"></i></button>
        <button data-tool="select" title="矩形选区 M" aria-label="选择工具"><i data-icon="select"></i></button>
        <button data-tool="lasso" title="自由选区 L" aria-label="自由选区"><i data-icon="lasso"></i></button><button data-tool="capture" title="区域截图 K" aria-label="区域截图工具"><i data-icon="capture"></i></button><span></span>
@@ -86,7 +88,17 @@
   </main>
   <footer class="statusbar"><div><span id="coordinate-status"><i data-icon="crosshair"></i> X: — &nbsp; Y: —</span><span class="status-divider"></span><span id="dimension-status">960 × 640 px</span><span id="selection-status"></span></div><div><span id="save-status"><span class="live-dot"></span>示例已就绪</span><span class="status-divider"></span><button data-action="toggle-grid" title="像素网格 Ctrl+'" aria-label="像素网格"><i data-icon="grid"></i></button><button data-action="zoom-out" title="缩小" aria-label="缩小">−</button><input id="zoom-range" type="range" min="-3" max="5" step="0.05" value="0" aria-label="画布缩放"><button data-action="zoom-in" title="放大" aria-label="放大">＋</button><button id="zoom-label" data-action="zoom-dialog">100%</button><button data-action="fullscreen" title="全屏" aria-label="全屏"><i data-icon="fullscreen"></i></button></div></footer>
   <input id="file-input" type="file" accept="image/*,.paintspace,.pinjing,.pixelroom,.json" multiple hidden><input id="directory-input" type="file" accept="image/*" webkitdirectory multiple hidden><input id="project-input" type="file" accept=".paintspace,.pinjing,.pixelroom,.json" hidden><input id="guides-input" type="file" accept=".json" hidden><input id="native-color" type="color" hidden>
-  <div id="popover" class="popover" hidden></div><div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="popover" class="popover" data-lg-light hidden></div><div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <section id="lg-appearance-panel" data-lg-light role="dialog" aria-labelledby="lg-appearance-title" hidden>
+    <div class="lg-appearance-heading"><strong id="lg-appearance-title">工作台外观</strong><span>LIQUID GLASS</span></div>
+    <div class="lg-theme-options" role="radiogroup" aria-label="明暗主题">
+      <button type="button" class="lg-theme-choice" data-lg-theme-choice="system" role="radio" aria-checked="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="3"></rect><path d="M8 21h8M12 17v4"></path></svg>跟随系统</button>
+      <button type="button" class="lg-theme-choice" data-lg-theme-choice="light" role="radio" aria-checked="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>浅色</button>
+      <button type="button" class="lg-theme-choice" data-lg-theme-choice="dark" role="radio" aria-checked="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4A9 9 0 0 1 10.6 3.4a9 9 0 1 0 10 10Z"></path></svg>深色</button>
+    </div>
+    <label class="lg-simple-option"><span><strong>简约效果</strong><small>使用实色表面，减少动态效果</small></span><input id="lg-simple-effects" type="checkbox"></label>
+    <p id="lg-appearance-status" role="status" aria-live="polite">跟随系统外观与辅助功能设置</p>
+  </section>
   <dialog id="dialog"><form method="dialog" id="dialog-form"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" id="dialog-close" class="icon-button" aria-label="关闭"><i data-icon="close"></i></button></div><div id="dialog-body"></div><div class="dialog-actions"><button type="button" id="dialog-cancel" class="button">取消</button><button type="submit" id="dialog-submit" class="button primary">确定</button></div></form></dialog>
-  <div id="print-view"></div><script type="module" src="./app.js"></script>
+  <div id="print-view"></div><script type="module" src="./app.js"></script><script type="module" src="./liquid-glass.js"></script>
 </body></html>
