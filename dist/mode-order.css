@@ -3,7 +3,6 @@
 .mode-tabs{flex:0 1 auto;min-width:0;overscroll-behavior-x:contain;touch-action:pan-x}
 .mode-tabs>button{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;cursor:grab}
 .mode-tabs>button:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
-.mode-tabs>button.mode-pressing:before{content:'';position:absolute;left:14px;right:14px;bottom:3px;height:2px;border-radius:2px;background:var(--accent);transform-origin:left;animation:mode-hold .38s linear both}
 .mode-tabs>button.mode-drag-source{opacity:.28;background:#f19b6412;outline:1px dashed #f19b6466;outline-offset:-4px}
 .mode-tabs>button.mode-drop-target{background:#f19b6424;box-shadow:inset 0 0 0 2px var(--accent);color:#ffd6ba}
 .mode-tabs.mode-reordering>button,.reordering-modes,.reordering-modes *{cursor:grabbing!important}
@@ -11,6 +10,4 @@
 .mode-tab-ghost svg{width:16px;height:16px;flex-shrink:0;color:var(--accent)}
 .mode-drag-hint{position:fixed;z-index:151;pointer-events:none;border:1px solid #f19b6460;border-radius:5px;background:#312c2b;color:#ffd1b2;padding:6px 10px;font-size:11px;white-space:nowrap;box-shadow:0 4px 12px #0004}
 .mode-order-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
-@keyframes mode-hold{from{transform:scaleX(0);opacity:.35}to{transform:scaleX(1);opacity:1}}
 @media(max-width:760px){.mode-tabs{flex:1 1 auto}.mode-tabs>button,.mode-tabs>button:last-child{min-width:88px}}
-@media(prefers-reduced-motion:reduce){.mode-tabs>button.mode-pressing:before{animation:none}}
