@@ -215,6 +215,11 @@ html[data-lg-theme] .cmp-slot-marker.is-dock .cmp-slot-marker-label { color: var
 
 /* Fixed canvas, frame counts, measurements and export progress. */
 html[data-lg-theme] :is(.tc-heading > span, .tc-note, .tc-measure-points .tc-point-empty, .tc-measure-hint) { color: var(--lg-muted); opacity: 1; }
+html[data-lg-theme] :is(.tc-transform-state, .tc-transform-fields > label) { color: var(--lg-muted); }
+html[data-lg-theme] .tc-transform-selection { color: var(--lg-ink); }
+html[data-lg-theme] :is(.tc-transform-tools > button, .tc-rotate-actions > button) { background: var(--lg-surface-raised); color: var(--lg-ink); border-color: var(--lg-border); border-radius: var(--lg-radius-capsule); }
+html[data-lg-theme] .tc-transform-tools > button[aria-pressed="true"] { background: var(--lg-accent-soft); color: var(--lg-accent); border-color: var(--lg-accent); }
+html[data-lg-theme] .tc-transform-error { color: var(--lg-danger); }
 html[data-lg-theme] .tc-controls .tc-preset { background: var(--lg-surface-raised); border-color: var(--lg-border); border-radius: var(--lg-radius-control); }
 html[data-lg-theme] .tc-preset :is(strong, small) { color: var(--lg-ink); }
 html[data-lg-theme] .tc-controls .tc-preset.tc-active { background: var(--lg-accent-soft); border-color: var(--lg-accent); }

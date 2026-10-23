@@ -14,7 +14,7 @@ const round = n => Math.round(n * 100) / 100;
 const finite = (n, fallback = 0) => Number.isFinite(Number(n)) ? Number(n) : fallback;
 const safeName = name => String(name || '拼接作品').replace(/[\\/:*?"<>|]/g, '_').slice(0, 100);
 const cloneLayer = cloneAssemblyLayer;
-const button = (action, name, title, extra = '') => '<button type="button" data-cmp-action="' + action + '" title="' + title + '" aria-label="' + title + '" ' + extra + '>' + icon(name) + '</button>';
+const button = (action, name, title, extra = '', label = '') => '<button type="button" data-cmp-action="' + action + '" title="' + title + '" aria-label="' + title + '" ' + extra + '>' + icon(name) + (label ? '<span class="tc-tool-label">' + esc(label) + '</span>' : '') + '</button>';
 
 export function createComposer(api, mount, { canvasMode = false } = {}) {
   const assets = new Map();
@@ -42,7 +42,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     '<button type="button" class="cmp-primary" data-cmp-action="export">' + icon('download') + '<span>导出拼图</span></button></div></header>',
     '<div class="cmp-viewport" tabindex="0" aria-label="拼接无限画布。拖动图片移动，角点缩放，圆点旋转，Shift多选，空格平移。"><canvas class="cmp-canvas" aria-label="拼接场景"></canvas>',
     '<div class="cmp-empty"><div class="cmp-empty-mark">' + icon('layers') + '</div><h2>让素材，组成完整画面。</h2><p>从下方素材带选择图片，开始你的场景、分镜或素材图集。</p><button type="button" class="cmp-primary" data-cmp-action="add-current">' + icon('plus') + '加入当前素材</button><small>每张素材都是独立副本，可随时送回绘画继续编辑</small></div>',
-    '<div class="cmp-viewtools">' + button('select-tool', 'select', '选择与变换 · V') + button('hand-tool', 'hand', '平移画布 · H') + '<span class="cmp-separator"></span>' + button('snap', 'target', '边缘与参考线吸附') + button('pixel', 'grid', '像素清晰显示') + button('fit', 'fit', '适应全部 · 0') + '</div>',
+    '<div class="cmp-viewtools">' + (canvasMode ? button('select-tool', 'move', '移动素材 · V', 'class="tc-tool-button"', '移动') + button('rotate-tool', 'rotate', '左右拖动素材旋转 · R', 'class="tc-tool-button"', '旋转') : button('select-tool', 'select', '选择与变换 · V')) + button('hand-tool', 'hand', '平移画布 · H') + '<span class="cmp-separator"></span>' + button('snap', 'target', canvasMode ? '网格吸附 · Alt 临时自由移动' : '边缘与参考线吸附') + button('pixel', 'grid', '像素清晰显示') + button('fit', 'fit', '适应全部 · 0') + '</div>',
     '<div class="cmp-zoombar">' + button('zoom-out', 'search', '缩小') + '<button type="button" data-cmp-action="actual" class="cmp-zoom-value">100%</button><button type="button" data-cmp-action="zoom-in" title="放大" aria-label="放大">+</button></div>',
     '<div class="cmp-canvas-help"><kbd>Shift</kbd> 多选 <span>·</span> <kbd>Alt</kbd> 暂停吸附 <span>·</span> <kbd>空格</kbd> 平移</div><div class="cmp-slot-hint" role="status" hidden></div>',
     '<div class="cmp-ref-indicator">' + icon('guides') + '<span>共享参考已同步</span></div></div>',
@@ -103,6 +103,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
   });
   const tileControls = canvasMode ? createTileCanvasControls({
     mount, getSettings: () => ({ ...state.canvas }), notify, onAction: name => handleAction(name),
+    onTransform: patch => transformTileSelection(patch),
     onApply(next, label = '设置画布与瓦片') {
       if (busy || restoring) return;
       const value = validateTileCanvas(next), resized = value.width !== state.canvas.width || value.height !== state.canvas.height;
@@ -112,7 +113,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     },
   }) : null;
   if (canvasMode) {
-    viewport.setAttribute('aria-label', '固定尺寸瓦片画布。拖动素材吸附网格，支持两点量取与瓦片分割。');
+    viewport.setAttribute('aria-label', '固定尺寸瓦片画布。V 移动素材，R 左右拖动素材旋转，Shift 旋转吸附 15 度，Alt 临时自由移动，M 选点测量，空格平移画布。');
     canvas.setAttribute('aria-label', '瓦片画布场景');
     $('.cmp-name-input').setAttribute('aria-label', '瓦片画布名称');
     $('.cmp-top-actions [data-cmp-action="export"] span').textContent = '导出画布';
@@ -182,11 +183,18 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     const p = rotateVector(0, -l.h / 2 - 28 / state.view.z, l.rotation);
     return screen({ x: l.x + l.w / 2 + p.x, y: l.y + l.h / 2 + p.y });
   }
+  function resizeHandlesVisible(l) {
+    // At fit-to-canvas scale, the corner targets used to cover an entire small
+    // pixel asset. Keep its body available for moving; zoom in to resize it.
+    return !canvasMode || state.tool === 'select' && Math.min(l.w, l.h) * state.view.z >= 28;
+  }
   function hitHandle(p) {
+    if (canvasMode && !['select', 'rotate'].includes(state.tool)) return null;
     const list = selected().filter(l => l.visible);
     if (list.length !== 1 || list[0].locked) return null;
     const l = list[0], r = rotationHandle(l);
-    if (Math.hypot(p.x - r.x, p.y - r.y) < 12) return { type: 'rotate', layer: l };
+    if (Math.hypot(p.x - r.x, p.y - r.y) < (canvasMode ? 16 : 12)) return { type: 'rotate', layer: l };
+    if (!resizeHandlesVisible(l)) return null;
     const cs = corners(l).map(screen);
     for (let i = 0; i < cs.length; i++) if (Math.hypot(p.x - cs[i].x, p.y - cs[i].y) < 10) return { type: 'resize', layer: l, corner: i };
     return null;
@@ -232,11 +240,20 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     for (const l of list) {
       const cs = corners(l).map(screen); context.strokeStyle = l.locked ? '#888c98' : '#a899ff'; context.lineWidth = 1.4; context.beginPath(); cs.forEach((p, i) => i ? context.lineTo(p.x, p.y) : context.moveTo(p.x, p.y)); context.closePath(); context.stroke();
     }
-    if (list.length === 1 && !list[0].locked) {
+    if (list.length === 1 && !list[0].locked && (!canvasMode || ['select', 'rotate'].includes(state.tool))) {
       const l = list[0], cs = corners(l).map(screen), r = rotationHandle(l);
       context.strokeStyle = '#b1a4ff'; context.fillStyle = '#f2edff'; context.lineWidth = 1.3;
-      for (const p of cs) { context.fillRect(p.x - 3.5, p.y - 3.5, 7, 7); context.strokeRect(p.x - 3.5, p.y - 3.5, 7, 7); }
-      context.beginPath(); context.moveTo((cs[0].x + cs[1].x) / 2, (cs[0].y + cs[1].y) / 2); context.lineTo(r.x, r.y); context.stroke(); context.beginPath(); context.arc(r.x, r.y, 4, 0, Math.PI * 2); context.fill(); context.stroke();
+      if (resizeHandlesVisible(l)) for (const p of cs) { context.fillRect(p.x - 3.5, p.y - 3.5, 7, 7); context.strokeRect(p.x - 3.5, p.y - 3.5, 7, 7); }
+      context.beginPath(); context.moveTo((cs[0].x + cs[1].x) / 2, (cs[0].y + cs[1].y) / 2); context.lineTo(r.x, r.y); context.stroke(); context.beginPath(); context.arc(r.x, r.y, canvasMode ? 9 : 4, 0, Math.PI * 2); context.fill(); context.stroke();
+      if (canvasMode) {
+        context.strokeStyle = '#342a63'; context.lineWidth = 1.4; context.beginPath(); context.arc(r.x, r.y, 4.5, -.65, 4.3); context.stroke();
+        context.beginPath(); context.moveTo(r.x + 3.7, r.y - 5.3); context.lineTo(r.x + 4.4, r.y - 1.4); context.lineTo(r.x + .6, r.y - 2.4); context.stroke();
+        if (state.tool === 'rotate' || gesture?.type === 'rotate') {
+          const label = round(l.rotation) + '°', x = clamp(r.x + 17, 8, Math.max(8, width - 78)), y = clamp(r.y - 11, 8, Math.max(8, height - 30));
+          context.font = '12px system-ui'; const labelWidth = context.measureText(label).width + 14;
+          context.fillStyle = '#172135ee'; context.fillRect(x, y, labelWidth, 24); context.fillStyle = '#f1f5ff'; context.fillText(label, x + 7, y + 16);
+        }
+      }
     }
     if (list.length > 1) { const sb = bounds(list), p = screen(sb); context.strokeStyle = '#b1a4ff'; context.setLineDash([5, 5]); context.strokeRect(p.x, p.y, sb.w * z, sb.h * z); context.setLineDash([]); }
     if (gesture?.type === 'marquee') { const a = screen(gesture.start), end = screen(gesture.end); context.fillStyle = '#a899ff20'; context.strokeStyle = '#a899ff'; context.fillRect(a.x, a.y, end.x - a.x, end.y - a.y); context.strokeRect(a.x, a.y, end.x - a.x, end.y - a.y); }
@@ -486,6 +503,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
   }
   function refreshProperties() {
     const list = selected(), l = list.length === 1 ? list[0] : null;
+    tileControls?.setTransform?.({ tool: state.tool, selectedCount: list.length, layer: l ? { id: l.id, name: l.name, x: l.x, y: l.y, w: l.w, h: l.h, rotation: l.rotation, locked: l.locked, visible: l.visible } : null, busy: busy || restoring });
     $('.cmp-properties').hidden = !l; $('.cmp-no-selection').hidden = !!l;
     $('.cmp-no-selection').textContent = list.length > 1 ? '已选中 ' + list.length + ' 个图层，可一起移动、对齐与排列。' : '选择一个图层，调整位置与尺寸。';
     for (const input of $$('[data-cmp-prop]')) { if (l) input.value = round(l[input.dataset.cmpProp]); input.disabled = busy || !l || l.locked; }
@@ -508,10 +526,24 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     $('[data-cmp-action="redo"]').disabled = busy || historyIndex >= history.length - 1;
     for (const name of ['delete', 'duplicate', 'up', 'down']) $('[data-cmp-action="' + name + '"]').disabled = busy || !editable().length;
     for (const name of ['export', 'send']) $('[data-cmp-action="' + name + '"]').disabled = busy || (!canvasMode && !visible().length);
-    $('[data-cmp-action="snap"]').classList.toggle('is-active', state.snap);
+    const snapping = canvasMode ? state.canvas.snapGrid : state.snap;
+    $('[data-cmp-action="snap"]').classList.toggle('is-active', snapping);
+    $('[data-cmp-action="snap"]').setAttribute('aria-pressed', String(snapping));
     $('[data-cmp-action="pixel"]').classList.toggle('is-active', state.pixel);
     $('[data-cmp-action="select-tool"]').classList.toggle('is-active', state.tool === 'select');
     $('[data-cmp-action="hand-tool"]').classList.toggle('is-active', state.tool === 'hand');
+    for (const [action, tool] of [['select-tool', 'select'], ['rotate-tool', 'rotate'], ['hand-tool', 'hand']]) {
+      for (const control of $$('[data-cmp-action="' + action + '"]')) { control.setAttribute('aria-pressed', String(state.tool === tool)); control.classList.toggle('is-active', state.tool === tool); control.disabled = busy; }
+    }
+    if (canvasMode) {
+      const hints = {
+        select: '<kbd>V</kbd> 拖动素材移动 <span>·</span> <kbd>R</kbd> 旋转 <span>·</span> <kbd>Alt</kbd> 自由移动',
+        rotate: '左右拖动素材或拖动圆环旋转 <span>·</span> <kbd>Shift</kbd> 15° <span>·</span> <kbd>V</kbd> 返回移动',
+        measure: '点击选取 P1、P2 <span>·</span> <kbd>V</kbd> 返回移动 <span>·</span> 测量结果保留',
+        hand: '拖动平移画布 <span>·</span> <kbd>V</kbd> 移动素材',
+      };
+      $('.cmp-canvas-help').innerHTML = hints[state.tool] || hints.select;
+    }
     $('.cmp-transparent').checked = state.background === 'transparent';
     if (state.background !== 'transparent') $('.cmp-background').value = state.background;
     $('.cmp-gap').value = state.gap; $('.cmp-columns').value = state.columns; $('.cmp-normalize').checked = state.normalize;
@@ -534,6 +566,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     const unique = [...new Map(docs.filter(Boolean).map(d => [d.id, d])).values()];
     if (!unique.length) { notify('请先在下方选择素材。'); return; }
     if (state.layers.length + unique.length > LIMIT.layers) throw Error('拼接场景最多支持 80 个图层，请先整理图层。');
+    if (canvasMode && gesture) cancelGesture();
     busy = true;
     try {
       api.finishPending();
@@ -558,7 +591,8 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
         return l;
       }) : layoutLayers(newLayers, { mode: 'row', gap: state.gap, normalize: false });
       additions.forEach(a => assets.set(a.id, a)); state.layers.push(...arranged); state.selected = new Set(arranged.map(l => l.id));
-      initialized = true; commit('加入工作区素材'); fit(); if (!quiet) notify('已加入 ' + additions.length + ' 张素材副本，原图不受拼接编辑影响。');
+      if (canvasMode) { state.tool = 'select'; canvas.style.cursor = 'move'; }
+      initialized = true; commit('加入工作区素材'); fit(); if (!quiet) notify(canvasMode ? '已加入 ' + additions.length + ' 张素材，可直接拖动移动；按 R 或拖动圆环旋转。' : '已加入 ' + additions.length + ' 张素材副本，原图不受拼接编辑影响。');
     } finally { busy = false; refresh(); api.refresh?.(); }
   }
   function patchLayers(patches, label) {
@@ -760,7 +794,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
         cancelGesture(); slotEditor.close(); Object.assign(state, { name: canvasMode ? '瓦片画布' : '拼接画布', layers: [], view: { x: width / 2, y: height / 2, z: 1 }, tool: 'select', background: 'transparent', pixel: true, snap: true, slotSnap: !canvasMode, showSlots: !canvasMode, canvas: canvasMode ? validateTileCanvas() : null, gap: 24, columns: 3, normalize: false, padding: 0 }); state.selected.clear(); assets.clear(); localClipboard = []; measurePoints = []; tileHover = null; canvasViewReady = false; viewNeedsFirstResize = false; initialized = true; resetHistory(); if (canvasMode && active) { fit(); canvasViewReady = true; } refresh(); return;
       }
       await applyParsedProject(await parseProject(data));
-    } finally { restoring = false; }
+    } finally { restoring = false; if (canvasMode) refreshProperties(); }
   }
   async function openLegacyProject(file) {
     if (!file) return;
@@ -790,7 +824,24 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
   function finishTransform(event) {
     const target = gesture?.slotCandidate, childId = gesture?.originals?.length === 1 ? gesture.originals[0].id : null;
     if (target && childId && !event?.altKey && attachLayer(state.layers, childId, target.parentId, target.slotId)) return '卡槽对接';
-    return '变换图层';
+    return canvasMode ? ({ move: '移动素材', rotate: '旋转素材', resize: '缩放素材' }[gesture?.type] || '变换图层') : '变换图层';
+  }
+  function setTool(tool) {
+    if (gesture) cancelGesture();
+    state.tool = tool;
+    canvas.style.cursor = tool === 'hand' ? 'grab' : tool === 'measure' ? 'crosshair' : tool === 'rotate' ? 'ew-resize' : 'default';
+    refresh();
+  }
+  function transformTileSelection(patch) {
+    if (!canvasMode || busy || restoring) return;
+    if (gesture) cancelGesture();
+    const list = selected(), l = list.length === 1 ? list[0] : null;
+    if (!l || l.locked || !l.visible) return;
+    const keys = ['x', 'y', 'rotation'].filter(key => Object.prototype.hasOwnProperty.call(patch, key));
+    if (!keys.length || keys.some(key => !Number.isFinite(patch[key]))) return;
+    if (keys.some(key => key === 'x' || key === 'y')) detachLayer(l);
+    for (const key of keys) l[key] = key === 'rotation' ? round(((patch[key] % 360) + 360) % 360) % 360 : clamp(patch[key], -1000000, 1000000);
+    commit(keys.includes('rotation') ? '旋转素材' : '精确移动素材');
   }
   function nudgeSelection(dx, dy) {
     const roots = movementRoots(state.layers, editable().map(l => l.id));
@@ -824,6 +875,12 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
       return;
     }
     const hit = hitScene(w);
+    if (canvasMode && state.tool === 'rotate') {
+      if (!hit) { state.selected.clear(); refresh(); return; }
+      state.selected = new Set([hit.id]); refresh();
+      gesture = { type: 'rotate', layer: hit, original: cloneLayer(hit), start: w, startScreen: p, rotationInput: 'horizontal', before: state.layers.map(cloneLayer) };
+      return;
+    }
     if (hit) {
       if (event.shiftKey) { selectLayer(hit.id, true); if (!state.selected.has(hit.id)) return; }
       else if (!state.selected.has(hit.id)) selectLayer(hit.id, false);
@@ -842,9 +899,10 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     if (pointers.has(event.pointerId)) pointers.set(event.pointerId, p);
     if (!gesture) {
       const handle = hitHandle(p);
-      canvas.style.cursor = space || state.tool === 'hand' ? 'grab' : state.tool === 'measure' ? 'crosshair' : handle ? (handle.type === 'rotate' ? 'crosshair' : handle.corner % 2 ? 'nesw-resize' : 'nwse-resize') : hitScene(w) ? 'move' : 'default';
+      canvas.style.cursor = space || state.tool === 'hand' ? 'grab' : state.tool === 'measure' ? 'crosshair' : handle ? (handle.type === 'rotate' ? 'crosshair' : handle.corner % 2 ? 'nesw-resize' : 'nwse-resize') : hitScene(w) ? (canvasMode && state.tool === 'rotate' ? 'ew-resize' : 'move') : 'default';
       if (canvasMode) requestDraw(); return;
     }
+    if (!pointers.has(event.pointerId)) return;
     if (gesture.type === 'pinch') {
       if (pointers.size < 2) return;
       const [a, b] = [...pointers.values()], center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -871,7 +929,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
         }
       }
       const gridSnapped = !gesture.slotCandidate && !event.altKey && snapMovingToGrid(gesture.originals);
-      if (!gesture.slotCandidate && !gridSnapped && !event.altKey && state.snap) {
+      if (!gesture.slotCandidate && !gridSnapped && !event.altKey && state.snap && !canvasMode) {
         const snap = snapTranslation(moving, visible().filter(l => !movingIds.has(l.id)), 7 / state.view.z, api.getState()?.snapToGuides !== false ? sharedGuides() : []);
         for (const original of gesture.originals) { const l = state.layers.find(item => item.id === original.id); l.x += snap.dx; l.y += snap.dy; }
         resolveAttachments(state.layers); transientGuides = snap.guides;
@@ -885,9 +943,16 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
       const c = rotateVector(signs[0] * nw / 2, signs[1] * nh / 2, o.rotation);
       l.x = a.x + c.x - nw / 2; l.y = a.y + c.y - nh / 2; l.w = nw; l.h = nh;
     } else if (gesture.type === 'rotate') {
-      const { original: o, layer: l } = gesture, angle = Math.atan2(w.y - o.y - o.h / 2, w.x - o.x - o.w / 2);
-      let rotation = o.rotation + (angle - gesture.angle) * 180 / Math.PI; if (event.shiftKey) rotation = Math.round(rotation / 15) * 15;
-      l.rotation = round(((rotation % 360) + 360) % 360);
+      const { original: o, layer: l } = gesture;
+      let rotation;
+      if (gesture.rotationInput === 'horizontal') rotation = o.rotation + p.x - gesture.startScreen.x;
+      else {
+        const dx = w.x - o.x - o.w / 2, dy = w.y - o.y - o.h / 2;
+        if (canvasMode && Math.hypot(dx, dy) * state.view.z < 8) return;
+        rotation = o.rotation + (Math.atan2(dy, dx) - gesture.angle) * 180 / Math.PI;
+      }
+      if (event.shiftKey) rotation = Math.round(rotation / 15) * 15;
+      l.rotation = round(((rotation % 360) + 360) % 360) % 360;
     } else if (gesture.type === 'marquee') {
       gesture.end = w; const box = { x: Math.min(w.x, gesture.start.x), y: Math.min(w.y, gesture.start.y), right: Math.max(w.x, gesture.start.x), bottom: Math.max(w.y, gesture.start.y) };
       state.selected = new Set(gesture.previous);
@@ -896,6 +961,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     resolveAttachments(state.layers); requestDraw(); refreshProperties();
   });
   function finishPointer(event) {
+    if (!pointers.has(event.pointerId)) return;
     pointers.delete(event.pointerId); if (!gesture) return;
     if (gesture.type === 'pinch') {
       if (pointers.size === 1) gesture = { type: 'pan', start: [...pointers.values()][0], view: { ...state.view } };
@@ -908,14 +974,15 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
   canvas.addEventListener('pointerup', finishPointer);
   canvas.addEventListener('pointerleave', () => { if (!gesture) { tileHover = null; requestDraw(); } });
   canvas.addEventListener('pointercancel', () => { cancelGesture(); refresh(); });
-  canvas.addEventListener('lostpointercapture', event => { if (pointers.has(event.pointerId)) finishPointer(event); });
+  canvas.addEventListener('lostpointercapture', event => { if (!pointers.has(event.pointerId)) return; if (canvasMode) { cancelGesture(); refresh(); } else finishPointer(event); });
   canvas.addEventListener('wheel', event => { if (!active) return; event.preventDefault(); if (!gesture) zoomAt(Math.exp(-clamp(event.deltaY * (event.deltaMode === 1 ? 16 : 1), -200, 200) * .0015), local(event)); }, { passive: false });
   canvas.addEventListener('contextmenu', event => event.preventDefault());
-  canvas.addEventListener('dblclick', event => { if (busy || state.tool === 'measure') return; const l = hitScene(world(local(event))); if (!l) return; state.selected = new Set([l.id]); const b = bounds([l]); state.view.z = clamp(Math.min((width - 120) / b.w, (height - 110) / b.h), .015, 4); state.view.x = width / 2 - (b.x + b.w / 2) * state.view.z; state.view.y = height / 2 - (b.y + b.h / 2) * state.view.z; refresh(); });
+  canvas.addEventListener('dblclick', event => { if (busy || state.tool === 'measure' || canvasMode && state.tool === 'rotate') return; const l = hitScene(world(local(event))); if (!l) return; state.selected = new Set([l.id]); const b = bounds([l]); state.view.z = clamp(Math.min((width - 120) / b.w, (height - 110) / b.h), .015, 4); state.view.x = width / 2 - (b.x + b.w / 2) * state.view.z; state.view.y = height / 2 - (b.y + b.h / 2) * state.view.z; refresh(); });
 
   async function handleAction(name) {
     if (name === 'tile-cancel') { tileExportAbort?.abort(); return true; }
     if (busy || restoring) { if (tileExportAbort) notify('正在导出瓦片，请等待完成或取消导出。'); return true; }
+    if (canvasMode && gesture) cancelGesture();
     switch (name) {
       case 'undo': undo(); break;
       case 'redo': redo(); break;
@@ -926,15 +993,21 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
       case 'actual': zoomAt(1, undefined, true); break;
       case 'zoom-in': zoomAt(1.25); break;
       case 'zoom-out': zoomAt(.8); break;
-      case 'select-tool': state.tool = 'select'; refresh(); break;
-      case 'hand-tool': state.tool = 'hand'; refresh(); break;
-      case 'measure-grid': if (canvasMode) { cancelGesture(); state.tool = state.tool === 'measure' ? 'select' : 'measure'; canvas.style.cursor = state.tool === 'measure' ? 'crosshair' : 'default'; refresh(); } break;
+      case 'select-tool': setTool('select'); break;
+      case 'hand-tool': setTool('hand'); break;
+      case 'rotate-tool': if (canvasMode) setTool('rotate'); break;
+      case 'rotate-left': case 'rotate-right': case 'rotate-reset': {
+        const list = selected(), l = list.length === 1 ? list[0] : null;
+        if (canvasMode && l) transformTileSelection({ rotation: name === 'rotate-reset' ? 0 : l.rotation + (name === 'rotate-left' ? -90 : 90) });
+        break;
+      }
+      case 'measure-grid': if (canvasMode) setTool(state.tool === 'measure' ? 'select' : 'measure'); break;
       case 'clear-measure': measurePoints = []; updateMeasurement(); requestDraw(); break;
       case 'center-canvas': positionCanvasContent(); break;
       case 'fit-canvas-content': positionCanvasContent(true); break;
       case 'canvas-png': await exportCanvasPNG(); break;
       case 'tile-export': await exportTiles(); break;
-      case 'snap': state.snap = !state.snap; refresh(); api.persist(); break;
+      case 'snap': if (canvasMode) { state.canvas = { ...state.canvas, snapGrid: !state.canvas.snapGrid }; commit('网格吸附'); } else { state.snap = !state.snap; refresh(); api.persist(); } break;
       case 'pixel': state.pixel = !state.pixel; refresh(); api.persist(); break;
       case 'ratio': state.ratio = !state.ratio; refreshProperties(); break;
       case 'delete': deleteSelected(); break;
@@ -1008,6 +1081,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     else if (!mod && key === '1') action = 'actual';
     else if (!mod && key === 'v') action = 'select-tool';
     else if (!mod && key === 'h') action = 'hand-tool';
+    else if (canvasMode && !mod && key === 'r') action = 'rotate-tool';
     else if (canvasMode && !mod && key === 'm') action = 'measure-grid';
     if (action) { event.preventDefault(); event.stopImmediatePropagation(); await handleAction(action); return; }
     if (event.code === 'Space' && event.target.closest('button,[role="button"]')) return;
@@ -1017,7 +1091,7 @@ export function createComposer(api, mount, { canvasMode = false } = {}) {
     if (mod && key === 'v' && localClipboard.length) { event.preventDefault(); event.stopImmediatePropagation(); duplicate(localClipboard); return; }
     if (!mod && key.startsWith('arrow')) { event.preventDefault(); event.stopImmediatePropagation(); const n = event.shiftKey ? 10 : 1; nudgeSelection(key === 'arrowleft' ? -n : key === 'arrowright' ? n : 0, key === 'arrowup' ? -n : key === 'arrowdown' ? n : 0); }
   }), true);
-  document.addEventListener('keyup', event => { if (event.code === 'Space') { space = false; if (active) canvas.style.cursor = state.tool === 'hand' ? 'grab' : state.tool === 'measure' ? 'crosshair' : 'default'; } });
+  document.addEventListener('keyup', event => { if (event.code === 'Space') { space = false; if (active) canvas.style.cursor = state.tool === 'hand' ? 'grab' : state.tool === 'measure' ? 'crosshair' : state.tool === 'rotate' ? 'ew-resize' : 'default'; } });
   window.addEventListener('blur', () => { space = false; if (gesture) { cancelGesture(); refresh(); } });
   function resizeViewport() {
     if (!viewport.clientWidth || !viewport.clientHeight) return;

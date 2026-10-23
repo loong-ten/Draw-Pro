@@ -282,6 +282,7 @@ test('an empty tile canvas saves isolated settings and restores its dimensions t
   await h.composer.handleAction('redo'); assert.deepEqual(h.composer.serialize().canvas, canvas);
   const roundtrip = h.composer.serialize(); await h.composer.restore(roundtrip);
   assert.deepEqual(h.composer.serialize(), roundtrip); assert.equal(h.composer.getHistoryState().canUndo, false);
+  assert.equal(h.mount.querySelector('.tc-width').disabled, false, 'restoring a project releases panel busy state');
   await h.setting('showGrid', false); await h.composer.handleAction('undo'); assert.equal(h.composer.serialize().canvas.showGrid, true);
   assert.ok(h.persistCount >= 8);
 });
@@ -392,6 +393,178 @@ test('real pointer drags snap all three anchors to grid intersections and exact 
   await h.composer.restore(project);
   await h.pointer('pointerdown', 18, 16); await h.pointer('pointermove', 39, 33, { altKey: true }); await h.pointer('pointerup', 39, 33, { altKey: true });
   close(getLayer(h, 'moving').x, 29, 'Alt bypass X'); close(getLayer(h, 'moving').y, 25, 'Alt bypass Y');
+});
+
+test('selected 16 px and 32 px tiles remain draggable when zoomed out instead of hitting resize corners', async t => {
+  const h = await harness(t);
+  for (const size of [16, 32]) {
+    const project = fixture({ canvas: { width: 1000, height: 800, snapGrid: false }, layers: [layer('moving', 'green', { x: 100, y: 100, w: size, h: size })], settings: { snap: true } });
+    project.view = { x: 0, y: 0, z: .25 };
+    await h.composer.restore(project); await h.select('moving');
+    const x = 100 + size / 2, y = 100 + size / 2;
+    await h.pointer('pointerdown', x, y); await h.pointer('pointermove', x + 24, y + 16); await h.pointer('pointerup', x + 24, y + 16);
+    const moved = getLayer(h, 'moving');
+    assert.deepEqual([moved.x, moved.y, moved.w, moved.h, moved.rotation], [124, 116, size, size, 0], 'small selected image moves without changing shape');
+    await h.composer.handleAction('undo');
+    assert.deepEqual([getLayer(h, 'moving').x, getLayer(h, 'moving').y], [100, 100]);
+    assert.equal(h.composer.getHistoryState().canUndo, false, 'the complete drag is a single history entry');
+    await h.composer.handleAction('redo');
+    assert.deepEqual([getLayer(h, 'moving').x, getLayer(h, 'moving').y], [124, 116]);
+  }
+});
+
+test('adding a source exits measurement, pan and rotation so the new tile can immediately move', async t => {
+  const h = await harness(t, fixture({ canvas: { width: 160, height: 120, snapGrid: false } }), { sources: [sourceDoc('sprite', 16, 16)] });
+  await h.tc('measure-grid'); await h.pointer('pointerdown', 31, 17); await h.pointer('pointerup', 31, 17);
+  const point = h.mount.querySelector('.tc-measure-p1').textContent;
+  for (const previousTool of [null, 'hand-tool', 'rotate-tool']) {
+    if (previousTool) await h.composer.handleAction(previousTool);
+    await h.composer.handleAction('add-current');
+    assert.equal(h.mount.querySelector('[data-tc-action="measure-grid"]').getAttribute('aria-pressed'), 'false');
+    assert.equal(h.mount.querySelector('.tc-measure-p1').textContent, point, 'switching to move retains the measurement');
+    const scene = h.composer.serialize(), added = scene.layers.at(-1), center = { x: added.x + added.w / 2, y: added.y + added.h / 2 };
+    await h.pointer('pointerdown', center.x, center.y); await h.pointer('pointermove', center.x + 5, center.y + 7); await h.pointer('pointerup', center.x + 5, center.y + 7);
+    const moved = getLayer(h, added.id);
+    assert.deepEqual([moved.x, moved.y, moved.w, moved.h, moved.rotation], [added.x + 5, added.y + 7, 16, 16, 0]);
+    assert.deepEqual(h.composer.serialize().view, scene.view, 'dragging the imported tile does not pan the viewport');
+  }
+});
+
+test('the rotation tool uses screen distance at different zooms, snaps to 15 degrees and records one undo step', async t => {
+  const h = await harness(t);
+  for (const zoom of [.5, 2]) {
+    const project = fixture({ canvas: { width: 400, height: 300, snapGrid: false }, layers: [layer('moving', 'green', { x: 100, y: 80, w: 32, h: 16 })] });
+    project.view = { x: 0, y: 0, z: zoom };
+    await h.composer.restore(project); await h.select('moving'); await h.composer.handleAction('rotate-tool');
+    await h.pointer('pointerdown', 116, 88); await h.pointer('pointermove', 116 + 47 / zoom, 88);
+    close(getLayer(h, 'moving').rotation, 47, 'one CSS pixel is one degree');
+    await h.pointer('pointermove', 116 + 31 / zoom, 88, { shiftKey: true }); await h.pointer('pointerup', 116 + 31 / zoom, 88, { shiftKey: true });
+    const rotated = getLayer(h, 'moving');
+    assert.deepEqual([rotated.x, rotated.y, rotated.w, rotated.h, rotated.rotation], [100, 80, 32, 16, 30]);
+    await h.composer.handleAction('undo'); close(getLayer(h, 'moving').rotation, 0); assert.equal(h.composer.getHistoryState().canUndo, false);
+    await h.composer.handleAction('redo'); close(getLayer(h, 'moving').rotation, 30);
+    await h.pointer('pointerdown', 116, 88); await h.pointer('pointermove', 116 - 22 / zoom, 88); await h.pointer('pointerup', 116 - 22 / zoom, 88);
+    close(getLayer(h, 'moving').rotation, 8, 'dragging left reverses rotation');
+  }
+});
+
+test('the visible rotation handle still turns a selected tile around its center', async t => {
+  const project = fixture({ canvas: { width: 300, height: 200 }, layers: [layer('moving', 'green', { x: 100, y: 80, w: 32, h: 20 })] });
+  project.view = { x: 0, y: 0, z: 1.5 };
+  const h = await harness(t, project); await h.select('moving');
+  const radius = 10 + 28 / 1.5;
+  await h.pointer('pointerdown', 116, 90 - radius); await h.pointer('pointermove', 116 + radius, 90); await h.pointer('pointerup', 116 + radius, 90);
+  const result = getLayer(h, 'moving');
+  assert.deepEqual([result.x, result.y, result.w, result.h, result.rotation], [100, 80, 32, 20, 90]);
+  await h.composer.handleAction('undo'); close(getLayer(h, 'moving').rotation, 0);
+  await h.composer.handleAction('redo'); close(getLayer(h, 'moving').rotation, 90);
+});
+
+test('cancel, lost capture and Escape restore unfinished move and rotation gestures without history', async t => {
+  const project = fixture({ canvas: { width: 300, height: 200, snapGrid: false }, layers: [layer('moving', 'green', { x: 80, y: 80, w: 60, h: 40 })] });
+  const h = await harness(t, project);
+  for (const tool of ['select-tool', 'rotate-tool']) for (const cancel of ['pointercancel', 'lostpointercapture', 'Escape']) {
+    await h.composer.restore(project); await h.select('moving'); await h.composer.handleAction(tool);
+    const before = h.composer.serialize().layers;
+    await h.pointer('pointerdown', 110, 100); await h.pointer('pointermove', 145, 105);
+    assert.notDeepEqual(h.composer.serialize().layers, before, 'the gesture has a visible preview before cancellation');
+    if (cancel === 'Escape') await h.document.emit('keydown', { target: h.mount.querySelector('.cmp-canvas'), key: 'Escape', code: 'Escape' });
+    else await h.pointer(cancel, 145, 105);
+    await h.pointer('pointerup', 145, 105);
+    assert.deepEqual(h.composer.serialize().layers, before, tool + ' ' + cancel + ' restores all layer values');
+    assert.equal(h.composer.getHistoryState().canUndo, false, 'cancelled preview never creates history');
+  }
+});
+
+test('locked, hidden and multiple selections cannot be changed by single-tile rotation actions', async t => {
+  const project = fixture({ canvas: { width: 300, height: 200, snapGrid: false }, layers: [
+    layer('locked', 'green', { x: 20, y: 20, w: 32, h: 32, locked: true }),
+    layer('hidden', 'green', { x: 80, y: 20, visible: false }),
+    layer('a', 'green', { x: 120, y: 20 }), layer('b', 'green', { x: 140, y: 20 }),
+  ] });
+  const h = await harness(t, project), before = h.composer.serialize().layers;
+  await h.select('locked');
+  for (const tool of ['select-tool', 'rotate-tool']) {
+    await h.composer.handleAction(tool); await h.pointer('pointerdown', 36, 36); await h.pointer('pointermove', 56, 46); await h.pointer('pointerup', 56, 46);
+  }
+  for (const id of ['locked', 'hidden', 'a']) {
+    await h.select(id); if (id === 'a') await h.select('b', true);
+    for (const action of ['rotate-left', 'rotate-right', 'rotate-reset']) await h.composer.handleAction(action);
+  }
+  assert.deepEqual(h.composer.serialize().layers, before); assert.equal(h.composer.getHistoryState().canUndo, false);
+});
+
+test('tile snap toolbar and checkbox agree, and disabled grid snapping permits free movement without edge snapping', async t => {
+  const h = await harness(t, fixture({ canvas: { width: 200, height: 140, tileWidth: 16, tileHeight: 16 }, layers: [
+    layer('moving', 'green', { x: 8, y: 8, w: 16, h: 16 }), layer('nearby', 'green', { x: 46, y: 40, w: 32, h: 32 }),
+  ], settings: { snap: true } }));
+  const button = () => h.mount.querySelector('[data-cmp-action="snap"]');
+  assert.equal(h.composer.serialize().canvas.snapGrid, true); assert.equal(button().classList.contains('is-active'), true);
+  await h.composer.handleAction('snap');
+  assert.equal(h.composer.serialize().canvas.snapGrid, false); assert.equal(h.mount.querySelector('[data-tc-setting="snapGrid"]').checked, false);
+  assert.equal(button().classList.contains('is-active'), false); assert.equal(h.composer.serialize().settings.snap, true, 'legacy edge setting remains separate');
+  await h.select('moving'); await h.pointer('pointerdown', 16, 16); await h.pointer('pointermove', 42, 38); await h.pointer('pointerup', 42, 38);
+  assert.deepEqual([getLayer(h, 'moving').x, getLayer(h, 'moving').y], [34, 30], 'nearby scene edges do not pull a free tile off its pointer position');
+  await h.composer.handleAction('undo'); assert.deepEqual([getLayer(h, 'moving').x, getLayer(h, 'moving').y], [8, 8]);
+  await h.composer.handleAction('undo'); assert.equal(h.composer.serialize().canvas.snapGrid, true); assert.equal(button().classList.contains('is-active'), true);
+  await h.setting('snapGrid', false); assert.equal(button().classList.contains('is-active'), false);
+  await h.setting('snapGrid', true); assert.equal(button().classList.contains('is-active'), true);
+});
+
+test('tile slot snapping takes priority over the grid and quick rotations preserve attachment constraints', async t => {
+  const project = fixture({ canvas: { width: 200, height: 120, tileWidth: 16, tileHeight: 16 }, layers: [
+    layer('host', 'green', { x: 43, y: 20, w: 40, h: 20, slots: [{ id: 'right', name: '右槽', u: 1, v: .5 }] }),
+    layer('part', 'green', { x: 120, y: 25, w: 10, h: 10, dock: { u: 0, v: .5 } }),
+  ], settings: { slotSnap: true } });
+  const h = await harness(t, project);
+  await h.pointer('pointerdown', 125, 30); await h.pointer('pointermove', 90, 30); await h.pointer('pointerup', 90, 30);
+  assertJoined(h); close(getLayer(h, 'part').x, 83, 'slot coordinate wins over the 16px grid');
+  await h.select('part'); await h.composer.handleAction('rotate-right'); assertJoined(h); close(getLayer(h, 'part').rotation, 90);
+  await h.composer.handleAction('undo'); assertJoined(h); close(getLayer(h, 'part').rotation, 0);
+  await h.composer.handleAction('redo'); assertJoined(h); close(getLayer(h, 'part').rotation, 90);
+  await h.select('host'); await h.composer.handleAction('rotate-left'); assertJoined(h); close(getLayer(h, 'host').rotation, 270); close(getLayer(h, 'part').rotation, 90);
+  await h.composer.handleAction('rotate-reset'); assertJoined(h); close(getLayer(h, 'host').rotation, 0);
+  const saved = h.composer.serialize(); await h.composer.restore(saved); assert.deepEqual(h.composer.serialize(), saved); assertJoined(h);
+  await h.composer.restore(project);
+  await h.pointer('pointerdown', 125, 30); await h.pointer('pointermove', 90, 30, { altKey: true }); await h.pointer('pointerup', 90, 30, { altKey: true });
+  assert.equal(getLayer(h, 'part').attachment, null); close(getLayer(h, 'part').x, 85, 'Alt bypasses both slot and grid attraction');
+});
+
+test('rotation survives project restore and sends the actual rotated pixels to the fixed canvas', async t => {
+  const h = await harness(t, fixture({ canvas: { width: 10, height: 8 }, layers: [layer('moving', 'red', { x: 2, y: 2 })] }));
+  await h.select('moving'); await h.composer.handleAction('rotate-right');
+  const saved = h.composer.serialize(); close(saved.layers[0].rotation, 90);
+  const source = saved.assets[0].src;
+  await h.composer.restore(saved); assert.deepEqual(h.composer.serialize(), saved);
+  await h.composer.handleAction('send');
+  assert.deepEqual([h.documents[0].width, h.documents[0].height], [10, 8]);
+  assertPixels(composite(h.documents[0]), [[5, 2, 255, 0, 0, 255]]);
+  assert.equal(h.composer.serialize().assets[0].src, source, 'rotation leaves the source bitmap intact');
+});
+
+test('tile transform panel events edit coordinates and angles, reject invalid drafts and disable locked layers', async t => {
+  const h = await harness(t, fixture({ canvas: { width: 200, height: 120, snapGrid: false }, layers: [layer('moving', 'green', { x: 20, y: 24, w: 16, h: 16 })] }));
+  await h.select('moving');
+  const input = key => h.mount.querySelector('[data-tc-transform="' + key + '"]');
+  for (const key of ['x', 'y', 'rotation']) assert.equal(input(key).disabled, false, key + ' is editable for a single visible layer');
+  await h.tc('rotate-tool'); assert.equal(h.mount.querySelector('[data-tc-action="rotate-tool"]').getAttribute('aria-pressed'), 'true');
+  await h.tc('select-tool'); assert.equal(h.mount.querySelector('[data-tc-action="select-tool"]').getAttribute('aria-pressed'), 'true');
+  input('x').value = '37.5'; await input('x').emit('change');
+  input('y').value = '44'; await input('y').emit('keydown', { key: 'Enter', code: 'Enter' });
+  input('rotation').value = '-450'; await input('rotation').emit('keydown', { key: 'Enter', code: 'Enter' });
+  assert.deepEqual([getLayer(h, 'moving').x, getLayer(h, 'moving').y, getLayer(h, 'moving').rotation], [37.5, 44, 270]);
+  const before = h.composer.serialize(), history = h.composer.getHistoryState();
+  input('x').value = ''; await input('x').emit('change');
+  assert.deepEqual(h.composer.serialize(), before); assert.deepEqual(h.composer.getHistoryState(), history);
+  assert.equal(h.mount.querySelector('.tc-transform-error').hidden, false);
+  await h.tc('rotate-right'); close(getLayer(h, 'moving').rotation, 0);
+  await h.composer.handleAction('undo'); close(getLayer(h, 'moving').rotation, 270);
+  const lock = h.mount.querySelector('[data-cmp-lock="moving"]'); await h.mount.emit('click', { target: lock });
+  const locked = h.composer.serialize();
+  for (const key of ['x', 'y', 'rotation']) assert.equal(input(key).disabled, true, key + ' is disabled when locked');
+  for (const action of ['rotate-left', 'rotate-right', 'rotate-reset']) assert.equal(h.mount.querySelector('[data-tc-action="' + action + '"]').disabled, true);
+  input('rotation').value = '30'; await input('rotation').emit('change');
+  assert.deepEqual(h.composer.serialize(), locked, 'programmatic input delivery also respects the lock guard');
 });
 
 test('two-point grid measurement reports partial edges without moving layers or recording history', async t => {

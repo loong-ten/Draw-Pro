@@ -6,12 +6,18 @@ const countText = value => Number(value || 0).toLocaleString('zh-CN');
 const coordinateText = value => Math.round(Number(value || 0) * 100) / 100;
 
 /** Settings are a draft until the composer accepts them into its own history. */
-export function createTileCanvasControls({ mount, getSettings, onApply, onAction, notify }) {
+export function createTileCanvasControls({ mount, getSettings, onApply, onAction, onTransform, notify }) {
   const section = document.createElement('section');
   section.className = 'tc-controls';
   section.setAttribute('aria-label', '瓦片画布设置');
   section.innerHTML = [
     '<header class="tc-heading"><div>' + icon('grid') + '<h3>画布与瓦片</h3></div><span>CANVAS</span></header>',
+    '<div class="tc-section tc-transform-section"><div class="tc-subheading"><h4>素材操作</h4><span class="tc-transform-state">未选择素材</span></div>',
+    '<div class="tc-transform-tools" role="group" aria-label="素材操作模式"><button type="button" data-tc-action="select-tool" aria-pressed="true">' + icon('move') + '移动素材 · V</button><button type="button" data-tc-action="rotate-tool" aria-pressed="false">' + icon('rotate') + '旋转素材 · R</button></div>',
+    '<p class="tc-transform-selection">点击画布中的素材，或从场景图层中选择。</p>',
+    '<div class="tc-transform-fields"><label><span>X · px</span><input data-tc-transform="x" type="number" step="any" aria-label="素材 X 坐标" disabled></label><label><span>Y · px</span><input data-tc-transform="y" type="number" step="any" aria-label="素材 Y 坐标" disabled></label><label><span>角度 · °</span><input data-tc-transform="rotation" type="number" step="any" aria-label="素材旋转角度" disabled></label></div>',
+    '<div class="tc-rotate-actions" role="group" aria-label="素材旋转快捷操作"><button type="button" data-tc-action="rotate-left" title="逆时针旋转 90°" aria-label="逆时针旋转 90 度" disabled>−90°</button><button type="button" data-tc-action="rotate-right" title="顺时针旋转 90°" aria-label="顺时针旋转 90 度" disabled>+90°</button><button type="button" data-tc-action="rotate-reset" title="旋转角度归零" disabled>角度归零</button></div>',
+    '<p class="tc-note tc-transform-help">直接拖动素材移动，Alt 临时自由移动；拖动圆环也可旋转。</p><p class="tc-transform-error" role="alert" hidden></p></div>',
     '<div class="tc-section"><div class="tc-subheading"><h4>画布尺寸</h4><span>px</span></div>',
     '<div class="tc-presets" aria-label="常用画布尺寸">',
     ...CANVAS_PRESETS.map(p => '<button type="button" class="tc-preset" data-tc-preset="' + esc(p.id) + '" title="' + esc(p.label + ' · ' + p.width + ' × ' + p.height) + '" aria-label="使用 ' + esc(p.label + '，' + p.width + ' × ' + p.height + ' 像素画布') + '" aria-pressed="false"><strong>' + esc(p.id === '2k' ? '2K' : p.label) + '</strong><small>' + p.width + '×' + p.height + '</small></button>'),
@@ -41,7 +47,11 @@ export function createTileCanvasControls({ mount, getSettings, onApply, onAction
   const $ = selector => section.querySelector(selector);
   const $$ = selector => [...section.querySelectorAll(selector)];
   let canvasSignature = '', tileSignature = '', localError = '', plan = null;
-  let progress = null, measurement = null;
+  let progress = null, measurement = null, transform = null, transformError = '';
+  const transformInputs = $$('[data-tc-transform]');
+  const rotationActions = ['rotate-left', 'rotate-right', 'rotate-reset'];
+  const isBusy = () => !!progress || !!transform?.busy;
+  const canTransform = () => transform?.selectedCount === 1 && !!transform.layer && !transform.layer.locked && transform.layer.visible !== false;
 
   function showError(error) {
     localError = error?.message || String(error || '');
@@ -59,7 +69,7 @@ export function createTileCanvasControls({ mount, getSettings, onApply, onAction
     return value;
   }
   function apply(patch, label) {
-    if (progress) return;
+    if (isBusy()) return;
     const next = validateTileCanvas({ ...getSettings(), ...patch });
     localError = '';
     if ('width' in patch || 'height' in patch) canvasSignature = '';
@@ -96,10 +106,44 @@ export function createTileCanvasControls({ mount, getSettings, onApply, onAction
     renderError();
   }
   function updateDisabled() {
-    for (const control of $$('input,select,button')) control.disabled = !!progress;
+    const busy = isBusy();
+    for (const control of $$('input,select,button')) control.disabled = busy;
     $('[data-tc-action="tile-cancel"]').disabled = !progress;
-    $('[data-tc-action="tile-export"]').disabled = !!progress || !plan?.exportable;
-    $('[data-tc-action="clear-measure"]').disabled = !!progress || !measurement?.points?.length;
+    $('[data-tc-action="tile-export"]').disabled = busy || !plan?.exportable;
+    $('[data-tc-action="clear-measure"]').disabled = busy || !measurement?.points?.length;
+    for (const input of transformInputs) input.disabled = busy || !canTransform() || typeof onTransform !== 'function';
+    for (const action of rotationActions) $('[data-tc-action="' + action + '"]').disabled = busy || !canTransform();
+  }
+  function renderTransform(forceInputs = false) {
+    const count = transform?.selectedCount || 0, layer = count === 1 ? transform.layer : null, tool = transform?.tool || 'select';
+    for (const [action, activeTool] of [['select-tool', 'select'], ['rotate-tool', 'rotate']]) {
+      const control = $('[data-tc-action="' + action + '"]'), selected = tool === activeTool;
+      control.setAttribute('aria-pressed', String(selected)); control.classList.toggle('tc-active', selected);
+    }
+    $('.tc-transform-state').textContent = layer?.locked ? '素材已锁定' : layer?.visible === false ? '素材已隐藏' : count ? countText(count) + ' 个素材' : '未选择素材';
+    $('.tc-transform-selection').textContent = layer ? layer.name || '未命名素材' : count > 1 ? '已多选，可一起移动；选择单个素材以旋转或精确定位。' : '点击画布中的素材，或从场景图层中选择。';
+    $('.tc-transform-selection').title = layer?.name || '';
+    $('.tc-transform-help').textContent = layer?.locked ? '先在场景图层中解锁，再移动或旋转素材。' : layer?.visible === false ? '先显示当前图层，再移动或旋转素材。' : tool === 'rotate' ? '左右拖动素材旋转，Shift 按 15° 吸附；拖动圆环也可旋转。' : tool === 'measure' ? '当前为选点测量。点击“移动素材”或“旋转素材”继续编辑，测量结果会保留。' : tool === 'hand' ? '当前为平移画布。点击“移动素材”后可直接拖动素材。' : '直接拖动素材移动，Alt 临时自由移动；拖动圆环也可旋转。';
+    for (const input of transformInputs) {
+      if (forceInputs || document.activeElement !== input) input.value = layer && Number.isFinite(layer[input.dataset.tcTransform]) ? coordinateText(layer[input.dataset.tcTransform]) : '';
+    }
+    $('.tc-transform-error').textContent = transformError;
+    $('.tc-transform-error').hidden = !transformError;
+    updateDisabled();
+  }
+  async function applyTransform(input) {
+    if (isBusy() || !canTransform() || typeof onTransform !== 'function') return;
+    const key = input.dataset.tcTransform, raw = input.value.trim(), value = Number(raw), id = transform.layer.id;
+    try {
+      if (!raw || !Number.isFinite(value)) throw new Error((key === 'rotation' ? '角度' : key.toUpperCase() + ' 坐标') + '须为有效数字。');
+      transformError = '';
+      if (value !== transform.layer[key]) await onTransform({ [key]: value });
+      if (transform?.layer?.id === id) input.value = coordinateText(transform.layer[key]);
+      renderTransform();
+    } catch (error) {
+      transformError = error?.message || String(error);
+      renderTransform(); notify?.(transformError, true);
+    }
   }
   function renderMeasurement() {
     const active = !!measurement?.active, points = measurement?.points || [];
@@ -151,25 +195,25 @@ export function createTileCanvasControls({ mount, getSettings, onApply, onAction
       if (input.type === 'checkbox') input.checked = !!value;
       else input.value = value;
     }
-    renderPlan(settings); renderMeasurement(); updateDisabled();
+    renderPlan(settings); renderMeasurement(); renderTransform();
   }
   section.addEventListener('click', async event => {
     try {
       const presetButton = event.target.closest('[data-tc-preset]');
       if (presetButton) {
-        if (progress) return;
+        if (isBusy()) return;
         const preset = CANVAS_PRESETS.find(item => item.id === presetButton.dataset.tcPreset);
         if (preset) apply({ width: preset.width, height: preset.height }, '使用 ' + preset.label + ' 画布');
         return;
       }
       const sizeButton = event.target.closest('[data-tc-tile-size]');
       if (sizeButton) {
-        if (progress) return;
+        if (isBusy()) return;
         const size = Number(sizeButton.dataset.tcTileSize);
         apply({ tileWidth: size, tileHeight: size }, '使用 ' + size + ' 像素瓦片'); return;
       }
-      const action = event.target.closest('[data-tc-action]')?.dataset.tcAction;
-      if (!action || (progress && action !== 'tile-cancel')) return;
+      const control = event.target.closest('[data-tc-action]'), action = control?.dataset.tcAction;
+      if (!action || control.disabled || (isBusy() && action !== 'tile-cancel')) return;
       if (action === 'apply-size') applySize();
       else if (action === 'apply-tiles') applyTiles();
       else if (action === 'swap-size') {
@@ -177,6 +221,7 @@ export function createTileCanvasControls({ mount, getSettings, onApply, onAction
         apply({ width: height, height: width }, '交换瓦片画布宽高');
       } else {
         localError = ''; renderError();
+        if (rotationActions.includes(action) || action === 'select-tool' || action === 'rotate-tool') transformError = '';
         await onAction(action);
       }
     } catch (error) { showError(error); }
@@ -192,9 +237,23 @@ export function createTileCanvasControls({ mount, getSettings, onApply, onAction
     event.preventDefault(); event.stopPropagation();
     try { selector.includes('tile-') ? applyTiles() : applySize(); } catch (error) { showError(error); }
   });
+  for (const input of transformInputs) {
+    input.addEventListener('change', () => applyTransform(input));
+    input.addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault(); event.stopPropagation(); return applyTransform(input);
+    });
+    input.addEventListener('blur', () => { if (!transformError) renderTransform(true); });
+  }
   refresh();
   return {
     refresh,
+    setTransform(value) {
+      const previousId = transform?.layer?.id, nextId = value?.layer?.id;
+      transform = value == null ? null : { ...value, layer: value.layer ? { ...value.layer } : null };
+      if (previousId !== nextId) transformError = '';
+      renderTransform(previousId !== nextId);
+    },
     setProgress(value) {
       progress = value == null ? null : { ...value };
       $('.tc-progress').hidden = !progress;
