@@ -218,8 +218,8 @@ dialog::backdrop{background:#10151b99;backdrop-filter:blur(4px)}
 #download-ready a{color:var(--accent)}
 #drop-overlay{background:#242d39ee;border-color:var(--accent);color:var(--accent)}
 #drop-overlay span{color:#a7b8cf;font-size:11px}
-body[data-mode=compose] .ribbon,body[data-mode=tile] .ribbon,body[data-mode=optimize] .ribbon,body[data-mode=compose] .optionsbar,body[data-mode=tile] .optionsbar,body[data-mode=optimize] .optionsbar{display:none}
-body[data-mode=compose] #zoom-range,body[data-mode=compose] #zoom-label,body[data-mode=tile] #zoom-range,body[data-mode=tile] #zoom-label,body[data-mode=optimize] #zoom-range,body[data-mode=optimize] #zoom-label{display:none}
+body[data-mode=compose] .ribbon,body[data-mode=tile] .ribbon,body[data-mode=slice] .ribbon,body[data-mode=optimize] .ribbon,body[data-mode=compose] .optionsbar,body[data-mode=tile] .optionsbar,body[data-mode=slice] .optionsbar,body[data-mode=optimize] .optionsbar{display:none}
+body[data-mode=compose] #zoom-range,body[data-mode=compose] #zoom-label,body[data-mode=tile] #zoom-range,body[data-mode=tile] #zoom-label,body[data-mode=slice] #zoom-range,body[data-mode=slice] #zoom-label,body[data-mode=optimize] #zoom-range,body[data-mode=optimize] #zoom-label{display:none}
 body[data-mode=retouch] .ribbon{display:none}
 .fine-primary,.opt-primary{color:#261e17}
 .fine-presets button{display:flex;flex-direction:column;gap:3px}
