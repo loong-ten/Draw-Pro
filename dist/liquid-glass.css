@@ -142,7 +142,8 @@ html[data-lg-theme] :is(.topbar, .modebar, .ribbon, .canvas-toolrail, #popover, 
 }
 html[data-lg-theme] .topbar { height: 60px; min-height: 60px; padding: 0 16px; gap: 16px; border-radius: var(--lg-radius-panel); margin-bottom: 8px; transition: height var(--lg-duration-normal) var(--lg-easing-spring), min-height var(--lg-duration-normal) var(--lg-easing-spring); }
 html[data-lg-theme] .brand { gap: 8px; color: var(--lg-ink); }
-html[data-lg-theme] .brand-symbol { display: grid; width: 34px; height: 34px; border-radius: 12px; color: var(--lg-accent); background: var(--lg-accent-soft); border: 1px solid var(--lg-glass-border); box-shadow: inset 0 1px 0 var(--lg-reflection), var(--lg-shadow-small); }
+html[data-lg-theme] .brand-symbol { display: grid; width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; background: transparent; border: 0; box-shadow: var(--lg-shadow-small); }
+html[data-lg-theme] .brand-favicon { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
 html[data-lg-theme] .brand strong { font-family: var(--lg-font-display); font-size: 20px; font-weight: 650; letter-spacing: -.6px; gap: 7px; }
 html[data-lg-theme] .pro-badge { border-radius: 6px; padding: 2px 5px; color: var(--lg-accent); border-color: var(--lg-border); font-size: 9px; letter-spacing: .7px; background: var(--lg-surface-raised); }
 html[data-lg-theme] :is(.brand-en, .project-type, .top-center, .top-center button) { color: var(--lg-muted); }
