@@ -58,6 +58,16 @@
 .pad-section h3>span{font:9px ui-monospace,monospace;color:#9a7d66}
 .pad-section h3>b{margin-left:auto;font-size:9px;font-weight:400;color:#7a92b0}
 .pad-mode-switch{margin-bottom:13px}
+.pad-mode-switch{flex-wrap:wrap}
+.pad-mode-switch button[data-pad-mode=crop]{flex-basis:100%}
+.pad-crop-controls{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;user-select:none}
+.pad-crop-controls .canvas-frame-handle{position:absolute;display:flex;align-items:center;justify-content:center;padding:0;margin:0;border:0;border-radius:0;background:transparent;box-shadow:none;transform:translate(-50%,-50%);pointer-events:auto;touch-action:none;transition:none}
+.pad-crop-controls .canvas-frame-handle:hover,.pad-crop-controls .canvas-frame-handle:active{background:transparent;transform:translate(-50%,-50%);box-shadow:none}
+.pad-crop-controls .canvas-frame-handle span{display:block;flex:none;width:9px;height:9px;border:1.5px solid #4c6c8d;border-radius:2px;background:#f3f8ff;box-shadow:0 1px 4px #0006;pointer-events:none}
+.pad-crop-controls .canvas-frame-handle:hover span,.pad-crop-controls .canvas-frame-handle:focus-visible span{background:#5ba6ff;border-color:#eef6ff}
+.pad-crop-controls .canvas-frame-handle:focus-visible{outline:1px solid #9bc6ff;outline-offset:-2px}
+.pad-crop-controls.is-dragging .canvas-frame-outline{border-color:#83b9ff;border-style:dashed}
+[data-pad=crop-fields] .pad-two{margin-top:12px;row-gap:12px}
 .pad-mode-switch button{flex:1;padding:6px 3px;white-space:nowrap}
 .pad-margin-field{margin-top:12px}
 .pad-check input:disabled{cursor:default}

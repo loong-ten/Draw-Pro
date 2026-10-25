@@ -1,4 +1,4 @@
-const BACKGROUNDS = new Set(['studio', 'checker', 'transparent']);
+const BACKGROUNDS = new Set(['studio', 'checker', 'dark-checker', 'transparent']);
 
 export function normalizeCanvasBackground(value) {
   return BACKGROUNDS.has(value) ? value : 'checker';
@@ -56,8 +56,8 @@ export function drawTransparencyBackground(ctx, { x, y, width, height }, kind = 
       ctx.fillStyle = gradient;
       ctx.fillRect(x, y, width, height);
     } else {
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, width, height);
-      ctx.fillStyle = '#e5e7e9';
+      ctx.fillStyle = kind === 'dark-checker' ? '#252B33' : '#ffffff'; ctx.fillRect(x, y, width, height);
+      ctx.fillStyle = kind === 'dark-checker' ? '#3A424D' : '#e5e7e9';
       const cell = 10, visible = visibleBounds(ctx, { x, y, width, height });
       for (let gx = Math.floor(visible.x / cell) * cell; gx < visible.x + visible.width; gx += cell) {
         for (let gy = Math.floor(visible.y / cell) * cell; gy < visible.y + visible.height; gy += cell) {

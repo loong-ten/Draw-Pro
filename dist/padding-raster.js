@@ -32,6 +32,7 @@ function normalizePlan(source, plan) {
   if (!source || typeof source.getContext !== 'function') throw new TypeError('缺少有效的原图画布。');
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) throw new RangeError('缺少有效的扩边或缩放参数。');
   const resize = plan.operation === 'resize';
+  const crop = plan.operation === 'crop';
   const contentWidth = resize ? plan.contentWidth : source.width;
   const contentHeight = resize ? plan.contentHeight : source.height;
   // Both outer canvas and inner content limits are checked before getImageData,
@@ -42,8 +43,9 @@ function normalizePlan(source, plan) {
     algorithm: resize ? plan.algorithm : 'nearest', sourceRect: resize ? plan.sourceRect : undefined,
   });
   if (!Number.isSafeInteger(plan.offsetX) || !Number.isSafeInteger(plan.offsetY) ||
-      plan.offsetX < 0 || plan.offsetY < 0 ||
-      contentWidth + plan.offsetX > plan.width || contentHeight + plan.offsetY > plan.height) {
+      (crop ? Math.abs(plan.offsetX) > 8192 || Math.abs(plan.offsetY) > 8192 :
+        plan.offsetX < 0 || plan.offsetY < 0 ||
+        contentWidth + plan.offsetX > plan.width || contentHeight + plan.offsetY > plan.height)) {
     throw new RangeError('结果不能裁切内容画布，且尺寸与偏移必须是整数像素。');
   }
   const rect = sampling.sourceRect;
@@ -278,7 +280,7 @@ export function applyPaddingSnapshot(doc, source, plan, preparedLayers) {
       layers.some(layer => layer.id === source.activeLayerId) ? source.activeLayerId : layers[0].id;
     candidate.history = doc.history.slice();
     if (doc.view) candidate.view = { ...doc.view, fit: true };
-    candidate.commit(`${plan.operation === 'resize' ? '宽高缩放' : '透明扩边'} · ${plan.width} × ${plan.height}`);
+    candidate.commit(`${plan.operation === 'resize' ? '宽高缩放' : plan.operation === 'crop' ? '画布裁剪' : '透明扩边'} · ${plan.width} × ${plan.height}`);
     candidate._composite = null; candidate._thumb = null; candidate.isDemo = false;
     writableFields(doc, fields);
     Object.defineProperties(doc, Object.fromEntries(fields.map(key => {
@@ -309,7 +311,7 @@ export function duplicateWithPadding(source, plan, name, preparedLayers) {
     doc.width = normalized.width; doc.height = normalized.height; doc.layers = layers;
     const index = source.layers.findIndex(layer => layer.id === source.activeLayerId);
     doc.activeLayerId = layers[Math.max(0, index)].id;
-    doc.resetHistory(plan.operation === 'resize' ? '创建宽高缩放副本' : '创建透明扩边副本');
+    doc.resetHistory(plan.operation === 'resize' ? '创建宽高缩放副本' : plan.operation === 'crop' ? '创建画布裁剪副本' : '创建透明扩边副本');
     doc.dirty = true;
     return doc;
   } catch (error) {

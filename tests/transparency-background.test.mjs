@@ -37,6 +37,15 @@ test('checker keeps the existing white/gray screen grid and clips every cell to 
   assertOutsideUnchanged(canvas, before);
 });
 
+test('dark checker uses the requested exact colors and clips every cell to the preview rectangle', () => {
+  const { canvas, ctx } = filledCanvas(), before = data(canvas).slice();
+  drawTransparencyBackground(ctx, rectangle, 'dark-checker');
+  assert.deepEqual(pixel(canvas, 8, 8), [58, 66, 77, 255]);
+  assert.deepEqual(pixel(canvas, 12, 8), [37, 43, 51, 255]);
+  assert.deepEqual(pixel(canvas, 12, 12), [58, 66, 77, 255]);
+  assertOutsideUnchanged(canvas, before);
+});
+
 test('studio is an opaque dark gradient and cannot paint outside its rectangle', () => {
   const { canvas, ctx } = filledCanvas(), before = data(canvas).slice();
   drawTransparencyBackground(ctx, rectangle, 'studio');
@@ -69,15 +78,17 @@ test('transparent removes the earlier white shadow fill only inside the rectangl
 });
 
 test('DPR keeps ten CSS-pixel checker cells and huge offscreen images remain bounded by the display canvas', () => {
-  const canvas = createCanvas(80, 60), ctx = canvas.getContext('2d');
-  ctx.setTransform(2, 0, 0, 2, 0, 0);
-  const originalFill = ctx.fillRect.bind(ctx); let fills = 0;
-  ctx.fillRect = (...args) => { fills++; return originalFill(...args); };
-  drawTransparencyBackground(ctx, { x: -100000, y: -100000, width: 200000, height: 200000 }, 'checker');
-  assert.deepEqual(pixel(canvas, 10, 10), [229, 231, 233, 255]);
-  assert.deepEqual(pixel(canvas, 25, 10), [255, 255, 255, 255]);
-  assert.ok(fills < 30, `draws ${fills} visible fills, not the whole zoomed image`);
-  assert.equal(ctx.getTransform().a, 2); assert.equal(ctx.getTransform().d, 2);
+  for (const kind of ['checker', 'dark-checker']) {
+    const canvas = createCanvas(80, 60), ctx = canvas.getContext('2d');
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    const originalFill = ctx.fillRect.bind(ctx); let fills = 0;
+    ctx.fillRect = (...args) => { fills++; return originalFill(...args); };
+    drawTransparencyBackground(ctx, { x: -100000, y: -100000, width: 200000, height: 200000 }, kind);
+    assert.deepEqual(pixel(canvas, 10, 10), kind === 'checker' ? [229, 231, 233, 255] : [58, 66, 77, 255]);
+    assert.deepEqual(pixel(canvas, 25, 10), kind === 'checker' ? [255, 255, 255, 255] : [37, 43, 51, 255]);
+    assert.ok(fills < 30, `draws ${fills} visible fills, not the whole zoomed image`);
+    assert.equal(ctx.getTransform().a, 2); assert.equal(ctx.getTransform().d, 2);
+  }
 });
 
 test('the real app background setter synchronizes both previews and saves a view preference without changing the document', () => {
@@ -94,31 +105,50 @@ test('the real app background setter synchronizes both previews and saves a view
     requestRender: () => calls.render++, persist: options => calls.persist.push(options),
     workbench: { padding: { refreshBackground: () => calls.padding++ }, serialize: () => ({ mode: 'paint' }) },
   });
-  for (const kind of ['studio', 'transparent', 'checker', 'invalid']) {
+  for (const kind of ['studio', 'transparent', 'checker', 'dark-checker', 'invalid']) {
     api.setCanvasBackground(kind);
     const expected = kind === 'invalid' ? 'checker' : kind;
     assert.equal(state.canvasBackground, expected); assert.equal(select.value, expected);
     assert.equal(api.settings().canvasBackground, expected);
   }
-  assert.equal(calls.render, 4); assert.equal(calls.padding, 4);
+  assert.equal(calls.render, 5); assert.equal(calls.padding, 5);
   assert.ok(calls.persist.every(options => options.sync === false));
   assert.equal(doc.history, history); assert.equal(doc.historyIndex, 0); assert.equal(doc.revision, 3);
   assert.equal(doc.dirty, false); assert.equal(state.workspaceDirty, false); assert.deepEqual([...data(canvas)], original);
 });
 
-test('real settings validation persists all three backgrounds and defaults old/invalid files to checker', async () => {
-  for (const kind of ['studio', 'checker', 'transparent', undefined, 'white', true, 42]) {
-    assert.equal(normalizeCanvasBackground(kind), ['studio', 'checker', 'transparent'].includes(kind) ? kind : 'checker');
+test('real settings validation persists all four backgrounds and defaults old/invalid files to checker', async () => {
+  for (const kind of ['studio', 'checker', 'dark-checker', 'transparent', undefined, 'white', true, 42]) {
+    assert.equal(normalizeCanvasBackground(kind), ['studio', 'checker', 'dark-checker', 'transparent'].includes(kind) ? kind : 'checker');
     let written;
     const directory = { kind: 'directory', queryPermission: async () => 'granted', requestPermission: async () => 'granted', getFileHandle: async () => ({
       createWritable: async () => ({ write: async blob => { written = blob; }, close: async () => {} }),
     }) };
     await writeGuides(directory, [], { canvasBackground: kind });
     const saved = JSON.parse(await written.text());
-    const expected = ['studio', 'checker', 'transparent'].includes(kind) ? kind : 'checker';
+    const expected = ['studio', 'checker', 'dark-checker', 'transparent'].includes(kind) ? kind : 'checker';
     assert.equal(saved.settings.canvasBackground, expected);
     const restored = await importGuides(new File([JSON.stringify({ kind: 'paint-studio-guides', version: 1,
       guides: [], settings: { canvasBackground: kind } })], 'references.json', { type: 'application/json' }));
     assert.equal(restored.settings.canvasBackground, expected);
+  }
+});
+
+test('app workspace restore preserves dark checker for the shared paint, retouch and padding preference', async () => {
+  const source = readFileSync(new URL('../dist/app.js', import.meta.url), 'utf8');
+  const code = source.slice(source.indexOf('async function applyWorkspace('), source.indexOf('function commitDocuments('));
+  const { canvas } = filledCanvas(), before = [...data(canvas)], document = { id: 'restored', canvas };
+  const state = { docs: [], canvasBackground: 'checker', mode: 'retouch' }, seen = [];
+  const apply = runInNewContext(`${code}\napplyWorkspace`, {
+    state, normalizeCanvasBackground, workspaceApplying: false, localSaveTask: null, localFileSync: null,
+    layerMove: { cancel() {} }, assertSlicerIdle() {}, captureRefs: () => [], $: () => ({}),
+    autosaveDisabled: false, lastDraftError: 0, renderUI() {}, fit() {}, renderLocalSync() {}, persist() {},
+    workbench: { restore: async () => {}, setMode: async () => seen.push(state.canvasBackground) },
+  });
+  for (const kind of ['dark-checker', 'studio', 'transparent', undefined, 'invalid']) {
+    await apply({ docs: [document], guides: [], settings: { canvasBackground: kind, workbench: { mode: 'retouch' } } });
+    const expected = ['dark-checker', 'studio', 'transparent'].includes(kind) ? kind : 'checker';
+    assert.equal(state.canvasBackground, expected); assert.equal(seen.at(-1), expected);
+    assert.equal(state.docs[0], document); assert.deepEqual([...data(canvas)], before);
   }
 });

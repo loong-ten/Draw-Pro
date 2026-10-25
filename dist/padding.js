@@ -2,10 +2,11 @@ import { composite } from './core.js';
 import { downloadBlob, exportAllZip } from './io.js';
 import { findAlphaBounds, planPadding } from './padding-core.js';
 import { paddedCanvas, paddedLayersAsync, applyPaddingSnapshot, duplicateWithPadding } from './padding-raster.js';
+import { canvasFrameFromDrag } from './canvas-frame-core.js';
 import { drawTransparencyBackground } from './transparency-background.js';
 
 const MAX_LAYER_PIXELS = 128 * 1024 * 1024;
-const DEFAULTS = { mode: 'ratio', ratioWidth: 1, ratioHeight: 1, scale: 1.5, targetWidth: 400, targetHeight: 200, resizeWidth: 48, resizeHeight: 48, resizeFit: 'stretch', resizeSizeMode: 'dimensions', resizePercent: 100, resizeLongEdge: 256, resizeAlgorithm: 'nearest', center: 'content', margin: 0 };
+const DEFAULTS = { mode: 'ratio', cropLeft: 0, cropRight: 0, cropTop: 0, cropBottom: 0, ratioWidth: 1, ratioHeight: 1, scale: 1.5, targetWidth: 400, targetHeight: 200, resizeWidth: 48, resizeHeight: 48, resizeFit: 'stretch', resizeSizeMode: 'dimensions', resizePercent: 100, resizeLongEdge: 256, resizeAlgorithm: 'nearest', center: 'content', margin: 0 };
 const ALGORITHMS = {
   nearest: { name: '最近邻', label: '最近邻 · 像素画（默认）', hint: '直接选取原像素，不混合颜色。适合像素画、图块与精灵；整数倍放大更利落，缩小时可能丢失细线。' },
   area: { name: '面积平均', label: '面积平均 · 缩小与缩略图', hint: '按源像素覆盖面积求平均，适合缩略图和大幅缩小；会混合颜色，放大时不是细节增强算法。' },
@@ -36,11 +37,11 @@ export function createPadding(api, mount) {
     <div class="pad-root">
       <section class="pad-workspace" aria-label="透明扩边预览">
         <header class="pad-heading"><div><span class="pad-eyebrow">TRANSPARENT PADDING & RESIZE</span><h2><span data-pad="heading">给像素留一点空间</span><span class="pad-auto-badge" data-pad="badge">自动居中</span></h2><p data-pad="filename">选择左侧素材开始</p></div><button class="pad-btn" data-pad-action="reload" title="以当前素材重新建立原图快照">↻ 重新读取</button></header>
-        <div class="pad-toolbar"><div class="pad-segment" aria-label="扩边预览方式"><button data-pad-view="compare" aria-pressed="true">前后对比</button><button data-pad-view="result" aria-pressed="false">仅结果</button></div><label class="pad-background">背景<select data-pad="background" aria-label="扩边预览背景" title="只改变预览背景，不写入素材或导出图片"><option value="studio">深色摄影棚</option><option value="checker">透明棋盘格</option><option value="transparent">透明背景</option></select></label><div class="pad-zoom"><button class="pad-btn" data-pad-action="zoom-out" aria-label="缩小扩边预览">−</button><span data-pad="zoom">100%</span><button class="pad-btn" data-pad-action="zoom-in" aria-label="放大扩边预览">＋</button><button class="pad-btn" data-pad-action="fit">适合</button><button class="pad-btn" data-pad-action="actual">1:1</button></div><label class="pad-check"><input type="checkbox" data-pad="guides" checked>辅助标记</label></div>
+        <div class="pad-toolbar"><div class="pad-segment" aria-label="扩边预览方式"><button data-pad-view="compare" aria-pressed="true">前后对比</button><button data-pad-view="result" aria-pressed="false">仅结果</button></div><label class="pad-background">背景<select data-pad="background" aria-label="扩边预览背景" title="只改变预览背景，不写入素材或导出图片"><option value="studio">深色摄影棚</option><option value="checker">透明棋盘格</option><option value="dark-checker">深色棋盘格</option><option value="transparent">透明背景</option></select></label><div class="pad-zoom"><button class="pad-btn" data-pad-action="zoom-out" aria-label="缩小扩边预览">−</button><span data-pad="zoom">100%</span><button class="pad-btn" data-pad-action="zoom-in" aria-label="放大扩边预览">＋</button><button class="pad-btn" data-pad-action="fit">适合</button><button class="pad-btn" data-pad-action="actual">1:1</button></div><label class="pad-check"><input type="checkbox" data-pad="guides" checked>辅助标记</label></div>
         <div class="pad-notice" data-pad="notice" role="status">正在识别素材中的可见像素…</div>
         <div class="pad-stage" data-pad="stage">
           <div class="pad-pane" data-pad="before-pane"><div class="pad-pane-label"><span>原始素材</span><b data-pad="before-label">—</b></div><canvas data-pad="before" aria-label="扩边前的素材预览"></canvas></div>
-          <div class="pad-pane" data-pad="after-pane"><div class="pad-pane-label"><span data-pad="result-label">扩边结果</span><b data-pad="after-label">—</b></div><canvas data-pad="after" aria-label="透明扩边与缩放结果预览"></canvas></div>
+          <div class="pad-pane" data-pad="after-pane"><div class="pad-pane-label"><span data-pad="result-label">扩边结果</span><b data-pad="after-label">—</b></div><canvas data-pad="after" aria-label="透明扩边与缩放结果预览"></canvas><div class="pad-crop-controls" data-pad="crop-controls" hidden><div class="canvas-frame-outline" data-pad="crop-outline"></div>${Object.entries({n:"上",ne:"右上",e:"右",se:"右下",s:"下",sw:"左下",w:"左",nw:"左上"}).map(([handle,label])=>`<button type="button" class="canvas-frame-handle frame-${handle}" data-pad-handle="${handle}" aria-label="拖动${label}边界裁剪画布" title="拖动${label}边界 · 方向键 1px / Shift 10px"><span></span></button>`).join('')}<div class="canvas-frame-readout" data-pad="crop-readout" role="status" aria-live="polite" hidden></div></div></div>
           <div class="pad-stage-error" data-pad="error" hidden role="alert"></div>
         </div>
         <div class="pad-legend"><span><i class="pad-key pad-key-bounds"></i>可见像素边界</span><span><i class="pad-key pad-key-source"></i><span data-pad="source-legend">原画布范围</span></span><span><i class="pad-key pad-key-center"></i>目标中心</span><small>滚轮缩放 · 拖动平移 · 标记仅供预览</small></div>
@@ -49,10 +50,11 @@ export function createPadding(api, mount) {
         <details class="pad-batch-details" data-pad="batch-details"><summary>工作区批量预览 <span data-pad="batch-count"></span></summary><div class="pad-table-wrap"><table><thead><tr><th>素材</th><th>原始尺寸</th><th>输出尺寸</th><th>状态</th></tr></thead><tbody data-pad="batch-rows"><tr><td colspan="4">点击右侧「预览工作区」查看逐张结果。</td></tr></tbody></table></div></details>
       </section>
       <aside class="pad-settings" aria-label="透明扩边参数">
-        <section class="pad-section"><h3><span>01</span>扩边与缩放</h3><div class="pad-mode-switch" aria-label="扩边与缩放方式"><button data-pad-mode="ratio" aria-pressed="true">宽高比</button><button data-pad-mode="scale" aria-pressed="false">画布倍率</button><button data-pad-mode="size" aria-pressed="false">像素尺寸</button><button data-pad-mode="resize" aria-pressed="false">图像缩放</button></div>
+        <section class="pad-section"><h3><span>01</span>扩边与缩放</h3><div class="pad-mode-switch" aria-label="扩边与缩放方式"><button data-pad-mode="ratio" aria-pressed="true">宽高比</button><button data-pad-mode="scale" aria-pressed="false">画布倍率</button><button data-pad-mode="size" aria-pressed="false">像素尺寸</button><button data-pad-mode="resize" aria-pressed="false">图像缩放</button><button data-pad-mode="crop" aria-pressed="false">画布裁剪</button></div>
           <div data-pad="ratio-fields"><div class="pad-ratios">${RATIOS.map(([w,h]) => `<button data-pad-ratio="${w}:${h}" aria-pressed="${w===1&&h===1}" title="目标画布宽高比 ${w}:${h}"><i style="--ratio:${w}/${h}"></i>${w}:${h}</button>`).join('')}</div><div class="pad-two"><label class="pad-field">宽度比例<input type="number" min="1" max="10000" step="1" data-pad-option="ratioWidth" aria-label="自定义宽度比例" value="1"></label><label class="pad-field">高度比例<input type="number" min="1" max="10000" step="1" data-pad-option="ratioHeight" aria-label="自定义高度比例" value="1"></label></div><p class="pad-hint">计算符合比例的最小画布。3:1、4:1 适合横向武器素材。</p></div>
           <div data-pad="scale-fields" hidden><div class="pad-quick">${[1.25,1.5,2,3,4].map(n => `<button data-pad-scale="${n}">${n}×</button>`).join('')}</div><label class="pad-field">画布宽高至少扩大至<input type="number" min="1" max="32" step="0.05" data-pad-option="scale" value="1.5"><span class="pad-inline">倍 · 素材本身保持原像素尺寸</span></label><p class="pad-hint">需要更多空间才能自动居中时，会继续补足透明边。参数切换始终基于本次读取的原图。</p></div>
           <div data-pad="size-fields" hidden><div class="pad-two"><label class="pad-field">目标宽度 · px<input type="number" min="1" max="8192" step="1" data-pad-option="targetWidth" value="400"></label><label class="pad-field">目标高度 · px<input type="number" min="1" max="8192" step="1" data-pad-option="targetHeight" value="200"></label></div><div class="pad-quick" role="group" aria-label="常用分辨率"><button type="button" data-pad-size="1280:720" aria-pressed="false" title="720p：1280 × 720 像素">720p · 1280×720</button><button type="button" data-pad-size="1920:1080" aria-pressed="false" title="1080p：1920 × 1080 像素">1080p · 1920×1080</button><button type="button" data-pad-size="2560:1440" aria-pressed="false" title="2K：2560 × 1440 像素">2K · 2560×1440</button></div><div class="pad-quick">${[[48,48],[64,64],[128,128],[256,256],[400,200],[200,400],[512,512]].map(([w,h]) => `<button data-pad-size="${w}:${h}">${w}×${h}</button>`).join('')}</div><p class="pad-hint">尺寸不足时会提示所需空间，不裁去原图或缩小素材。</p></div>
+          <div data-pad="crop-fields" hidden><p class="pad-hint">拖动结果画布的四边或四角：向外补透明，向内裁去像素。拖动时实时预览，松开一次应用；Esc 取消。可使用工具栏撤销 / 重做。</p><div class="pad-two">${[["cropLeft","左"],["cropRight","右"],["cropTop","上"],["cropBottom","下"]].map(([key,label])=>`<label class="pad-field">${label}边调整 · px<input type="number" min="-8192" max="8192" step="1" data-pad-option="${key}" aria-label="裁剪${label}边调整" value="0"></label>`).join('')}</div><p class="pad-hint">数值为正时扩展，为负时裁切；输入参数后点击「应用到当前素材」。批量处理对每张原图使用相同的四边调整。</p><button class="pad-btn pad-wide" data-pad-action="reset-crop">重置到本次读取的画幅</button></div>
           <div data-pad="resize-fields" hidden>
             <label class="pad-field">尺寸方式<select data-pad-option="resizeSizeMode" aria-label="缩放尺寸方式">${Object.entries(SIZE_MODES).map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select></label>
             <div class="pad-two pad-resize-dimensions" data-pad="resize-dimensions"><label class="pad-field" data-pad="resize-width-field">缩放宽度 · px<input type="number" min="1" max="8192" step="1" data-pad-option="resizeWidth" aria-label="自定义缩放宽度" value="48"></label><label class="pad-field" data-pad="resize-height-field">缩放高度 · px<input type="number" min="1" max="8192" step="1" data-pad-option="resizeHeight" aria-label="自定义缩放高度" value="48"></label></div>
@@ -74,7 +76,7 @@ export function createPadding(api, mount) {
   const state = {
     active: false, options: { ...DEFAULTS }, uniform: false, view: 'compare', guides: true,
     source: null, plan: null, expectedRevision: null, expectedWidth: 0, expectedHeight: 0,
-    currentKey: '', overridePlan: null, preview: null, previewPending: false, previewAbort: null, previewGeneration: 0, operationAbort: null, zoom: 1, beforeZoomRatio: 1, panX: 0, panY: 0, frame: null, drag: null,
+    currentKey: '', overridePlan: null, preview: null, previewPending: false, previewAbort: null, previewGeneration: 0, operationAbort: null, zoom: 1, beforeZoomRatio: 1, panX: 0, panY: 0, frame: null, drag: null, cropDrag: null,
     busy: false, cancel: false, batchRows: null, batchStamp: '', lastBatchStamp: '', capturing: false,
   };
 
@@ -103,7 +105,7 @@ export function createPadding(api, mount) {
     if (clear) state.preview = null;
   }
   function updateActions() {
-    const ready = !!state.source && !!state.plan && matchesCurrent() && !state.busy && !state.previewPending && previewReady();
+    const ready = !!state.source && !!state.plan && matchesCurrent() && !state.busy && !state.cropDrag && !state.previewPending && previewReady();
     mount.setAttribute('aria-busy', String(state.busy || state.previewPending));
     const same = ready && planKey(state.plan) === state.currentKey;
     actionButton('apply').disabled = !ready || same;
@@ -112,8 +114,8 @@ export function createPadding(api, mount) {
     actionButton('export').disabled = !ready;
     actionButton('reload').disabled = state.busy;
     actionButton('batch').disabled = state.busy || !api.getDocs().length || state.lastBatchStamp === workspaceStamp();
-    actionButton('batch').textContent = state.lastBatchStamp === workspaceStamp() ? '本批次已应用' : state.options.mode === 'resize' ? '批量应用缩放' : '批量应用扩边';
-    actionButton('duplicate').textContent = state.options.mode === 'resize' ? '创建缩放副本' : '创建扩边副本';
+    actionButton('batch').textContent = state.lastBatchStamp === workspaceStamp() ? '本批次已应用' : state.options.mode === 'resize' ? '批量应用缩放' : state.options.mode === 'crop' ? '批量应用裁剪' : '批量应用扩边';
+    actionButton('duplicate').textContent = state.options.mode === 'resize' ? '创建缩放副本' : state.options.mode === 'crop' ? '创建裁剪副本' : '创建扩边副本';
     actionButton('preview-batch').disabled = state.busy || !api.getDocs().length;
     actionButton('export-workspace').disabled = state.busy || !api.getDocs().length;
     $('doc-count').textContent = `${api.getDocs().length} 张`;
@@ -121,7 +123,7 @@ export function createPadding(api, mount) {
   function syncFields(preserveInputs = false) {
     if (!preserveInputs) mount.querySelectorAll('[data-pad-option]').forEach(input => { input.value = state.options[input.dataset.padOption]; });
     mount.querySelectorAll('[data-pad-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.padMode === state.options.mode)));
-    for (const mode of ['ratio', 'scale', 'size', 'resize']) $(mode + '-fields').hidden = state.options.mode !== mode;
+    for (const mode of ['ratio', 'scale', 'size', 'resize', 'crop']) $(mode + '-fields').hidden = state.options.mode !== mode;
     mount.querySelectorAll('[data-pad-ratio]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.padRatio === `${state.options.ratioWidth}:${state.options.ratioHeight}`)));
     mount.querySelectorAll('[data-pad-scale]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.padScale) === state.options.scale)));
     mount.querySelectorAll('[data-pad-size]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.padSize === `${state.options.targetWidth}:${state.options.targetHeight}`)));
@@ -130,10 +132,11 @@ export function createPadding(api, mount) {
     mount.querySelectorAll('[data-pad-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.padView === state.view)));
     $('before-pane').hidden = state.view !== 'compare';
     $('stage').classList.toggle('pad-result-only', state.view === 'result');
-    const resizing = state.options.mode === 'resize';
+    const resizing = state.options.mode === 'resize', cropping = state.options.mode === 'crop';
+    $('crop-controls').hidden = !cropping || !state.plan || state.busy;
     const sizeMode = state.options.resizeSizeMode;
     const fixedOutput = sizeMode === 'dimensions' && state.options.resizeFit !== 'inside';
-    $('uniform').checked = resizing ? fixedOutput : state.uniform; $('uniform').disabled = resizing || state.busy;
+    $('uniform').checked = cropping ? false : resizing ? fixedOutput : state.uniform; $('uniform').disabled = cropping || resizing || state.busy;
     $('guides').checked = state.guides;
     $('background').value = api.getState().canvasBackground || 'checker';
     $('resize-dimensions').hidden = !['dimensions','width','height'].includes(sizeMode);
@@ -143,17 +146,18 @@ export function createPadding(api, mount) {
     $('resize-percent-fields').hidden = sizeMode !== 'percent';
     $('resize-long-edge-field').hidden = sizeMode !== 'long-edge';
     $('resize-presets').hidden = $('resize-fit-field').hidden = sizeMode !== 'dimensions';
+    $('position-section').hidden = cropping;
     $('padding-position').hidden = resizing; $('resize-position').hidden = !resizing;
-    $('heading').textContent = resizing ? '把像素缩放到合适尺寸' : '给像素留一点空间';
-    $('badge').textContent = resizing ? ALGORITHMS[state.options.resizeAlgorithm].name : '自动居中';
-    $('result-label').textContent = resizing ? '缩放结果' : '扩边结果';
+    $('heading').textContent = cropping ? '拖动边界调整画幅' : resizing ? '把像素缩放到合适尺寸' : '给像素留一点空间';
+    $('badge').textContent = cropping ? '原像素裁剪' : resizing ? ALGORITHMS[state.options.resizeAlgorithm].name : '自动居中';
+    $('result-label').textContent = cropping ? '裁剪结果' : resizing ? '缩放结果' : '扩边结果';
     $('source-legend').textContent = resizing ? '缩放后原画布' : '原画布范围';
     $('detail-label').textContent = resizing ? '缩放后图像' : '可见像素范围';
-    $('edges-label').textContent = resizing ? '透明补边' : '四边新增';
+    $('edges-label').textContent = cropping ? '四边调整' : resizing ? '透明补边' : '四边新增';
     $('resize-hint').textContent = sizeMode === 'dimensions' ? FITS[state.options.resizeFit].hint : sizeMode === 'percent' ? '按每张原图的宽高分别计算比例，可放大或缩小；输出取整到像素，最小为 1 px。' : sizeMode === 'width' ? '只指定宽度，高度按每张原图的比例自动计算，不额外补边。' : sizeMode === 'height' ? '只指定高度，宽度按每张原图的比例自动计算，不额外补边。' : '将每张原图的最长边调整到指定尺寸，另一边等比计算，不额外补边。';
     $('algorithm-hint').textContent = ALGORITHMS[state.options.resizeAlgorithm].hint;
     $('resize-position-hint').textContent = sizeMode === 'dimensions' && state.options.resizeFit === 'cover' ? '按目标比例从原画布中心裁切，再等比缩放；被裁去的边缘不会出现在结果中。所有图层使用相同裁切范围。' : '以完整原画布为缩放范围，包含已有透明边。所有图层使用相同缩放与偏移。';
-    $('batch-hint').textContent = resizing ? fixedOutput ? `每张素材输出为指定宽高，使用「${FITS[state.options.resizeFit].label}」与${ALGORITHMS[state.options.resizeAlgorithm].name}；可先预览逐张尺寸。` : `每张素材按「${SIZE_MODES[sizeMode]}${sizeMode === 'dimensions' ? ' · 等比适应' : ''}」独立计算，输出尺寸可不同；使用${ALGORITHMS[state.options.resizeAlgorithm].name}。` : state.options.mode === 'size' ? '全部使用指定像素尺寸；无法完整容纳的素材会标出原因并跳过。' : state.uniform ? '先计算各张所需空间，再把有效素材统一为相同的画布尺寸。' : `每张素材独立识别中心，使用相同${state.options.mode === 'ratio' ? '宽高比' : '倍率'}。`;
+    $('batch-hint').textContent = cropping ? '每张原图使用相同的四边调整量；正数补透明、负数裁切。尺寸无效的素材会提示并跳过。' : resizing ? fixedOutput ? `每张素材输出为指定宽高，使用「${FITS[state.options.resizeFit].label}」与${ALGORITHMS[state.options.resizeAlgorithm].name}；可先预览逐张尺寸。` : `每张素材按「${SIZE_MODES[sizeMode]}${sizeMode === 'dimensions' ? ' · 等比适应' : ''}」独立计算，输出尺寸可不同；使用${ALGORITHMS[state.options.resizeAlgorithm].name}。` : state.options.mode === 'size' ? '全部使用指定像素尺寸；无法完整容纳的素材会标出原因并跳过。' : state.uniform ? '先计算各张所需空间，再把有效素材统一为相同的画布尺寸。' : `每张素材独立识别中心，使用相同${state.options.mode === 'ratio' ? '宽高比' : '倍率'}。`;
   }
   function renderPreviewError(error) {
     $('error').textContent = error.message; $('error').hidden = false;
@@ -190,7 +194,7 @@ export function createPadding(api, mount) {
     state.plan = null;
     try {
       const p = state.overridePlan || planPadding(s, state.options);
-      if (p.operation === 'resize') checkBudget(api.getDoc(), s, p);
+      if (['resize','crop'].includes(p.operation)) checkBudget(api.getDoc(), s, p);
       else state.preview = null;
       state.plan = p;
       $('target-size').textContent = `${p.width} × ${p.height}`;
@@ -202,6 +206,10 @@ export function createPadding(api, mount) {
         $('detection').textContent = p.resizeFit === 'contain' ? '等比缩放后自动居中' : p.resizeFit === 'cover' ? '从原画布中心裁切' : p.resizeFit === 'inside' ? '等比缩放，不补边' : '图像填满目标画布';
         $('center-readout').textContent = `图像 ${p.contentWidth} × ${p.contentHeight} px · 偏移 X ${p.offsetX} / Y ${p.offsetY}`;
         $('notice').textContent = `${ALGORITHMS[p.algorithm || 'nearest'].name} · ${p.resizeFit === 'cover' ? '等比填满并裁去超出部分' : p.resizeFit === 'contain' ? '等比完整显示，空余区域保持透明' : p.resizeFit === 'inside' ? '按原画布比例计算实际输出尺寸' : '直接缩放至指定宽高'} · 全部图层保留透明度`;
+      } else if (p.operation === 'crop') {
+        $('detection').textContent = '按整数像素裁剪，不缩放';
+        $('center-readout').textContent = `偏移 X ${p.offsetX} / Y ${p.offsetY}`;
+        $('notice').textContent = state.cropDrag ? `${p.width} × ${p.height} px · 松开一次应用 · Esc 取消` : '拖动四边或四角调整画幅 · 松开一次应用 · Esc 取消 · 全部图层同步';
       } else {
         $('center-readout').textContent = `原图中心位置 X ${p.centerX} · Y ${p.centerY}`;
         $('notice').textContent = !s.bounds ? '全透明素材：自动采用画布中心；设置留白时以整个原画布计算。' : state.options.center === 'canvas' ? '自动采用原画布中心 · 全部图层保持相对位置' : '自动检测非透明像素并居中 · 无需手动选择中心点';
@@ -225,6 +233,11 @@ export function createPadding(api, mount) {
     cancelPreview(true);
     try {
       const d = api.getDoc();
+      cancelCrop();
+      if (state.options.mode === 'crop' && state.source) {
+        Object.assign(state.options, {cropLeft:0,cropRight:0,cropTop:0,cropBottom:0});
+        syncFields();
+      }
       state.source = snapshot(d);
       state.overridePlan = null;
       rememberCurrent(d, identityKey(d.width, d.height));
@@ -237,6 +250,7 @@ export function createPadding(api, mount) {
   }
   function changeOptions(patch, fromInput = false) {
     if (state.busy) return;
+    cancelCrop();
     Object.assign(state.options, patch);
     state.overridePlan = null;
     state.batchRows = null; state.batchStamp = '';
@@ -257,6 +271,7 @@ export function createPadding(api, mount) {
     setZoom(z);
   }
   function setZoom(z, point) {
+    cancelCrop();
     const previous = state.zoom;
     state.zoom = clamp(z, .01, 64);
     if (point) {
@@ -275,6 +290,7 @@ export function createPadding(api, mount) {
     });
   }
   function draw(canvas, after) {
+    if (after) $('crop-controls').hidden = state.options.mode !== 'crop' || !state.plan || state.busy;
     const rect = canvas.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -285,7 +301,11 @@ export function createPadding(api, mount) {
     ctx.fillStyle = '#171c22'; ctx.fillRect(0, 0, rect.width, rect.height);
     const s = state.source, p = after ? state.plan : s;
     if (!s || !p) return;
-    const z = state.zoom * (after ? 1 : state.beforeZoomRatio), x = Math.round(rect.width / 2 - p.width * z / 2 + state.panX), y = Math.round(rect.height / 2 - p.height * z / 2 + state.panY);
+    const z = state.zoom * (after ? 1 : state.beforeZoomRatio);
+    const gesture = after && state.cropDrag;
+    const x = gesture ? gesture.originX + (gesture.options.cropLeft - p.offsetX) * z : Math.round(rect.width / 2 - p.width * z / 2 + state.panX);
+    const y = gesture ? gesture.originY + (gesture.options.cropTop - p.offsetY) * z : Math.round(rect.height / 2 - p.height * z / 2 + state.panY);
+    if (after) positionCrop(x, y, p.width*z, p.height*z);
     const dx = after ? p.offsetX : 0, dy = after ? p.offsetY : 0;
     const resized = after && p.operation === 'resize';
     const contentWidth = resized ? p.contentWidth : s.width, contentHeight = resized ? p.contentHeight : s.height;
@@ -342,16 +362,16 @@ export function createPadding(api, mount) {
     api.getState().selection = null; api.getState().lastAction = 'image';
     state.lastBatchStamp = ''; state.batchRows = null;
     calculate(); api.refresh(); api.persist();
-    api.toast(`已${p.operation === 'resize' ? '缩放' : '扩边'}至 ${p.width} × ${p.height} px，全部 ${d.layers.length} 个图层已保留，可撤销。`);
+    api.toast(`已${p.operation === 'resize' ? '缩放' : p.operation === 'crop' ? '裁剪' : '扩边'}至 ${p.width} × ${p.height} px，全部 ${d.layers.length} 个图层已保留，可撤销。`);
   }
   function duplicate() {
     assertReady();
     if (api.getDocs().length >= 100) throw new Error('工作区最多 100 张素材，请先关闭部分图片。');
     checkBudget(api.getDoc(), state.source, state.plan, true);
     const resizing = state.plan.operation === 'resize';
-    const d = duplicateWithPadding(state.source, state.plan, `${filename(state.source.name)}-${resizing ? 'resized' : 'padding'}.png`, resizing ? state.preview.layers : undefined);
+    const d = duplicateWithPadding(state.source, state.plan, `${filename(state.source.name)}-${resizing ? 'resized' : state.plan.operation === 'crop' ? 'crop' : 'padding'}.png`, resizing ? state.preview.layers : undefined);
     api.addDocument(d, { switchTo: true });
-    capture(true); api.toast(`已创建保留全部图层的${resizing ? '缩放' : '扩边'}副本。`);
+    capture(true); api.toast(`已创建保留全部图层的${resizing ? '缩放' : state.plan?.operation === 'crop' ? '裁剪' : '扩边'}副本。`);
   }
   async function exportPNG() {
     assertReady();
@@ -359,7 +379,7 @@ export function createPadding(api, mount) {
     const canvas = state.preview?.source === s.canvas && state.preview.key === planKey(p) ? state.preview.canvas : paddedCanvas(s.canvas, p);
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('PNG 编码失败，请降低目标尺寸后重试。');
-    downloadBlob(blob, `${filename(s.name)}-${p.operation === 'resize' ? 'resized' : 'padding'}-${p.width}x${p.height}.png`);
+    downloadBlob(blob, `${filename(s.name)}-${p.operation === 'resize' ? 'resized' : p.operation === 'crop' ? 'crop' : 'padding'}-${p.width}x${p.height}.png`);
     api.toast(`已生成 ${p.width} × ${p.height} 透明 PNG，辅助标记不会写入图片。`);
   }
 
@@ -367,7 +387,7 @@ export function createPadding(api, mount) {
     if (value) cancelPreview();
     state.busy = value;
     mount.querySelectorAll('[data-pad-option],[data-pad-mode],[data-pad-ratio],[data-pad-scale],[data-pad-size],[data-pad-resize],[data-pad-percent],[data-pad="uniform"]').forEach(control => { control.disabled = value; });
-    $('uniform').disabled = value || state.options.mode === 'resize';
+    $('uniform').disabled = value || ['resize','crop'].includes(state.options.mode);
     actionButton('cancel').hidden = !value || !cancellable; $('progress').hidden = !value;
     updateActions();
   }
@@ -406,7 +426,7 @@ export function createPadding(api, mount) {
       $('progress').value = i+1;
       await yieldUI();
     }
-    if (state.uniform && options.mode !== 'resize' && rows.length && !state.cancel) {
+    if (state.uniform && !['resize','crop'].includes(options.mode) && rows.length && !state.cancel) {
       const valid = rows.filter(row => row.plan && !row.error);
       if (valid.length) {
         const targetWidth = Math.max(...valid.map(row => row.plan.width));
@@ -499,6 +519,124 @@ export function createPadding(api, mount) {
     }
   }
 
+  // Share the drawing editor's integer edge/corner geometry. Only pointerup
+  // applies pixels; movement changes the preview plan and its screen boundary.
+  function positionCrop(x, y, width, height) {
+    const host = $('crop-controls');
+    host.hidden = state.options.mode !== 'crop' || !state.plan || state.busy;
+    if (host.hidden) return;
+    Object.assign($('crop-outline').style, {left:`${x}px`,top:`${y}px`,width:`${width}px`,height:`${height}px`});
+    host.classList.toggle('is-dragging', Boolean(state.cropDrag));
+    for (const button of mount.querySelectorAll('[data-pad-handle]')) {
+      const key=button.dataset.padHandle, corner=key.length===2;
+      Object.assign(button.style, {
+        left:`${x+(key.includes('e')?width:key.includes('w')?0:width/2)}px`,
+        top:`${y+(key.includes('s')?height:key.includes('n')?0:height/2)}px`,
+        width:`${key==='n'||key==='s'?Math.max(12,width-16):corner?20:12}px`,
+        height:`${key==='e'||key==='w'?Math.max(12,height-16):corner?20:12}px`,
+      });
+    }
+    const readout=$('crop-readout'); readout.hidden=!state.cropDrag;
+    readout.textContent=`${state.plan.width} × ${state.plan.height} px · 松开一次应用 · Esc 取消`;
+    readout.style.left=`${clamp(x+width/2,145,Math.max(145,$('after').clientWidth-145))}px`;
+    readout.style.top=`${Math.max(8,y-36)}px`;
+  }
+  function releaseCrop() {
+    const drag=state.cropDrag; state.cropDrag=null;
+    $('crop-controls').classList.remove('is-dragging'); $('crop-readout').hidden=true;
+    if (drag?.button.hasPointerCapture?.(drag.pointerId)) {
+      try { drag.button.releasePointerCapture(drag.pointerId); } catch { /* Already released. */ }
+    }
+    return drag;
+  }
+  function cancelCrop() {
+    if (!state.cropDrag) return false;
+    const drag=releaseCrop(); state.options={...drag.options}; state.overridePlan=drag.overridePlan;
+    syncFields(); calculate(); return true;
+  }
+  function cropValid(drag) {
+    return state.active && !state.busy && state.options.mode==='crop' &&
+      matchesCurrent() && api.getDoc()===drag.doc && state.source===drag.source &&
+      api.getDocs().includes(drag.doc) && drag.doc.layers.length===drag.layers.length &&
+      drag.doc.layers.every((layer,i)=>layer===drag.layers[i] && layer.canvas===drag.canvases[i]);
+  }
+  function moveCrop(event) {
+    const drag=state.cropDrag;
+    if (!drag || event.pointerId!==drag.pointerId) return;
+    if (!cropValid(drag)) { cancelCrop(); capture(); return; }
+    const frame=canvasFrameFromDrag(drag.plan,drag.handle,
+      (event.clientX-drag.clientX)/drag.zoom,(event.clientY-drag.clientY)/drag.zoom);
+    Object.assign(state.options, {
+      cropLeft:drag.options.cropLeft-frame.x,
+      cropRight:drag.options.cropRight+frame.x+frame.width-drag.plan.width,
+      cropTop:drag.options.cropTop-frame.y,
+      cropBottom:drag.options.cropBottom+frame.y+frame.height-drag.plan.height,
+    });
+    state.overridePlan=null; syncFields(); calculate();
+  }
+  for (const button of mount.querySelectorAll('[data-pad-handle]')) {
+    button.addEventListener('pointerdown',event=>{
+      if (event.button!==0 || state.cropDrag || state.busy || !state.active || state.options.mode!=='crop' || !state.plan || !matchesCurrent()) return;
+      event.preventDefault(); event.stopPropagation();
+      // A new gesture starts from the committed pixels, so expanding a
+      // previously cropped side adds transparency instead of reviving pixels.
+      if (state.currentKey!==identityKey(state.source.width,state.source.height) && planKey(state.plan)===state.currentKey) capture(true);
+      if (!state.plan) return;
+      const rect=$('after').getBoundingClientRect(), p=state.plan, d=api.getDoc();
+      state.drag=null;
+      state.cropDrag={button,pointerId:event.pointerId,handle:button.dataset.padHandle,
+        clientX:event.clientX,clientY:event.clientY,zoom:state.zoom,doc:d,source:state.source,
+        layers:[...d.layers],canvases:d.layers.map(layer=>layer.canvas),plan:{...p},
+        options:{...state.options},overridePlan:state.overridePlan,
+        originX:Math.round(rect.width/2-p.width*state.zoom/2+state.panX),
+        originY:Math.round(rect.height/2-p.height*state.zoom/2+state.panY)};
+      button.setPointerCapture(event.pointerId); updateActions(); render();
+    });
+    button.addEventListener('pointermove',moveCrop);
+    button.addEventListener('pointerup',event=>{
+      if (state.cropDrag?.pointerId!==event.pointerId) return;
+      event.preventDefault(); event.stopPropagation(); moveCrop(event);
+      if (!state.cropDrag) return;
+      const drag=releaseCrop();
+      try {
+        if (!cropValid(drag)) { state.options={...drag.options}; capture(); return; }
+        if (!state.plan) throw new Error('裁剪尺寸或工作区容量不可用，已取消本次拖动。');
+        const changed=planKey(state.plan)!==planKey(drag.plan);
+        if (changed) {
+          state.batchRows=null; state.batchStamp=''; state.lastBatchStamp='';
+          applyCurrent();
+        } else { calculate(); }
+      } catch(error) {
+        state.options={...drag.options}; state.overridePlan=drag.overridePlan;
+        syncFields(); calculate(); api.toast(error.message,true);
+      }
+    });
+    for (const name of ['pointercancel','lostpointercapture']) button.addEventListener(name,event=>{
+      if (state.cropDrag?.pointerId===event.pointerId) cancelCrop();
+    });
+    button.addEventListener('keydown',event=>{
+      if (!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key) || state.cropDrag || !state.active || state.busy || state.options.mode!=='crop' || !state.plan || !matchesCurrent()) return;
+      event.preventDefault(); event.stopPropagation();
+      if (state.currentKey!==identityKey(state.source.width,state.source.height) && planKey(state.plan)===state.currentKey) capture(true);
+      if (!state.plan) return;
+      const step=event.shiftKey?10:1, before={...state.options};
+      const frame=canvasFrameFromDrag(state.plan,button.dataset.padHandle,
+        event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0,
+        event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0);
+      try {
+        const p=state.plan;
+        changeOptions({cropLeft:before.cropLeft-frame.x,cropRight:before.cropRight+frame.x+frame.width-p.width,
+          cropTop:before.cropTop-frame.y,cropBottom:before.cropBottom+frame.y+frame.height-p.height});
+        applyCurrent();
+      } catch(error) { state.options=before;syncFields();calculate();api.toast(error.message,true); }
+    });
+  }
+  window.addEventListener('keydown',event=>{
+    if (event.key==='Escape' && cancelCrop()) { event.preventDefault();event.stopImmediatePropagation(); }
+    else if (state.cropDrag && (event.ctrlKey||event.metaKey) && ['z','y'].includes(event.key.toLowerCase())) cancelCrop();
+  },true);
+  window.addEventListener('blur',cancelCrop);
+
   for (const canvas of [$('before'),$('after')]) {
     canvas.addEventListener('wheel', event => {
       event.preventDefault(); event.stopPropagation();
@@ -506,7 +644,7 @@ export function createPadding(api, mount) {
       setZoom(state.zoom*Math.exp(-event.deltaY*.0015), {x:event.clientX-r.left-r.width/2,y:event.clientY-r.top-r.height/2});
     }, { passive:false });
     canvas.addEventListener('pointerdown', event => {
-      if (![0,1].includes(event.button)) return;
+      if (![0,1].includes(event.button) || state.cropDrag) return;
       event.preventDefault(); canvas.setPointerCapture(event.pointerId);
       state.drag = {id:event.pointerId,x:event.clientX,y:event.clientY,panX:state.panX,panY:state.panY};
     });
@@ -533,6 +671,7 @@ export function createPadding(api, mount) {
     }
   });
   const actions = {
+    'reset-crop':()=>changeOptions({cropLeft:0,cropRight:0,cropTop:0,cropBottom:0}),
     reload:()=>{state.lastBatchStamp='';state.batchRows=null;state.batchStamp='';capture(true);},
     apply:applyCurrent, duplicate, export:exportPNG, 'preview-batch':previewBatch, batch:applyBatch,
     cancel:()=>{state.cancel=true;state.operationAbort?.abort();}, fit, actual:()=>{state.beforeZoomRatio=1;setZoom(1);}, 'zoom-in':()=>setZoom(state.zoom*1.25), 'zoom-out':()=>setZoom(state.zoom/1.25),
@@ -556,7 +695,7 @@ export function createPadding(api, mount) {
   syncFields();
   return {
     activate() { state.active=true;capture();fit(); },
-    deactivate() { state.active=false;state.drag=null;cancelPreview();updateActions();if(state.frame!==null){cancelAnimationFrame(state.frame);state.frame=null;} },
+    deactivate() { cancelCrop();state.active=false;state.drag=null;cancelPreview();updateActions();if(state.frame!==null){cancelAnimationFrame(state.frame);state.frame=null;} },
     refresh() { if(state.active && !state.busy) capture(); },
     refreshBackground() { $('background').value=api.getState().canvasBackground || 'checker'; render(); },
     isBusy:()=>state.busy,
@@ -569,11 +708,15 @@ export function createPadding(api, mount) {
         if (typeof DEFAULTS[key] === 'number') {if(typeof value==='number'&&Number.isFinite(value))options[key]=value;}
         else if(typeof value==='string')options[key]=value;
       }
-      if(!['ratio','scale','size','resize'].includes(options.mode))options.mode='ratio';
+      if(!['ratio','scale','size','resize','crop'].includes(options.mode))options.mode='ratio';
       if(!['content','canvas'].includes(options.center))options.center='content';
       if(!Object.hasOwn(FITS,options.resizeFit))options.resizeFit='stretch';
       if(!Object.hasOwn(SIZE_MODES,options.resizeSizeMode))options.resizeSizeMode='dimensions';
       if(!Object.hasOwn(ALGORITHMS,options.resizeAlgorithm))options.resizeAlgorithm='nearest';
+      // Original read snapshots are session-local. A restored workspace already
+      // contains committed pixels; do not preview the last crop a second time.
+      Object.assign(options,{cropLeft:0,cropRight:0,cropTop:0,cropBottom:0});
+      cancelCrop();
       cancelPreview(true);
       state.options=options;state.uniform=Boolean(saved?.uniform);state.view=saved?.view==='result'?'result':'compare';state.guides=saved?.guides!==false;
       state.source=null;state.plan=null;state.overridePlan=null;state.preview=null;state.batchRows=null;state.batchStamp='';state.lastBatchStamp='';syncFields();

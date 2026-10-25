@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { PaintDocument } from '../dist/core.js';
 import { prepareWorkspaceDocuments } from '../dist/workspace-documents.js';
+import { normalizeCanvasBackground } from '../dist/transparency-background.js';
 import * as realIO from '../dist/io.js';
 
 const require = createRequire(import.meta.url);
@@ -72,7 +73,7 @@ function host(options = {}) {
   let shouldFailRestore = !!options.failRestore, shouldFailMode = !!options.failMode;
   const selected = options.directory || directory('新目录');
   const environment = {
-    state, PaintDocument, prepareWorkspaceDocuments, console, autosaveDisabled: false, lastDraftError: 0,
+    state, PaintDocument, prepareWorkspaceDocuments, normalizeCanvasBackground, console, autosaveDisabled: false, lastDraftError: 0,
     workspaceApplying: false, localSaveTask: null, localFileSync: null, renderLocalSync() {},
     clearTimeout() {}, layerMove: { cancel() {} },
     $(selector) { assert.ok(nodes.has(selector), selector); return nodes.get(selector); },

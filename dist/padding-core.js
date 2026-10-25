@@ -90,6 +90,18 @@ export function planPadding(source, options = {}) {
   dimensions(sourceWidth, sourceHeight, '原图');
   const bounds = validBounds(source.bounds, sourceWidth, sourceHeight);
   const mode = options.mode ?? 'ratio';
+  if (mode === 'crop') {
+    const left = integer(options.cropLeft ?? 0, '左边调整', -MAX_SIDE, MAX_SIDE);
+    const right = integer(options.cropRight ?? 0, '右边调整', -MAX_SIDE, MAX_SIDE);
+    const top = integer(options.cropTop ?? 0, '上边调整', -MAX_SIDE, MAX_SIDE);
+    const bottom = integer(options.cropBottom ?? 0, '下边调整', -MAX_SIDE, MAX_SIDE);
+    const width = sourceWidth + left + right, height = sourceHeight + top + bottom;
+    dimensions(width, height, '裁剪结果');
+    return { operation: 'crop', width, height, offsetX: left, offsetY: top,
+      contentWidth: sourceWidth, contentHeight: sourceHeight, left, right, top, bottom,
+      centerX: sourceWidth / 2, centerY: sourceHeight / 2, empty: !bounds,
+      changed: left !== 0 || right !== 0 || top !== 0 || bottom !== 0, minWidth: 1, minHeight: 1 };
+  }
   if (mode === 'resize') {
     const algorithm = options.resizeAlgorithm ?? 'nearest';
     if (!['nearest', 'bilinear', 'bicubic', 'lanczos3', 'area'].includes(algorithm)) {

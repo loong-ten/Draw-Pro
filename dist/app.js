@@ -382,7 +382,7 @@ async function applyWorkspace(result){
   const {workbench:savedWorkbench,...preferences}=result.settings||{};
   await workbench?.restore(savedWorkbench||{});
   state.docs=result.docs;state.guides=result.guides;Object.assign(state,preferences);
-  state.canvasBackground=['studio','checker','transparent'].includes(preferences.canvasBackground)?preferences.canvasBackground:'checker';
+  state.canvasBackground=normalizeCanvasBackground(preferences.canvasBackground);
   state.activeId=state.docs.some(d=>d.id===preferences.activeDocId)?preferences.activeDocId:state.docs[0].id;
   state.selection=null;state.gesture=null;state.curve=null;state.polygon=null;state.directory=null;state.workspaceDirty=false;
   state.guideHistory=[captureRefs()];state.guideHistoryIndex=0;
