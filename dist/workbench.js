@@ -107,11 +107,6 @@ export function installWorkbench(api) {
     state.pixelDisplay = event.target.checked;
     api.requestRender(); api.persist();
   });
-  $('#grid-size').addEventListener('change', event => {
-    state.gridSize = Math.max(1, Math.min(1024, Math.round(Number(event.target.value) || 1)));
-    state.showGrid = true;
-    api.requestRender(); api.persist();
-  });
   $('#layer-blend').addEventListener('change', event => {
     api.finishPending(); inspections.deactivate();
     const d = api.getDoc();
@@ -131,7 +126,6 @@ export function installWorkbench(api) {
     $('#workspace-title').textContent = state.workspaceName;
     $('#layer-blend').value = d.activeLayer.blend || 'source-over';
     $('#pixel-display').checked = state.pixelDisplay !== false;
-    $('#grid-size').value = state.gridSize || 1;
     if (['paint','retouch'].includes(state.mode) && ['adjust','history','pixel'].includes(inspector)) inspections.activate();
     else inspections.refresh();
     if (!switching && ['compose', 'tile'].includes(state.mode)) {

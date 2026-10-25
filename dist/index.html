@@ -8,6 +8,7 @@
   <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./composition-slots.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css"><link rel="stylesheet" href="./padding.css"><link rel="stylesheet" href="./tile-canvas.css"><link rel="stylesheet" href="./slicer.css"><link rel="stylesheet" href="./converter.css"><link rel="stylesheet" href="./region-capture.css">
   <link rel="stylesheet" href="./mode-order.css">
   <link rel="stylesheet" href="./liquid-glass.css"><link rel="stylesheet" href="./liquid-modes.css"><link rel="stylesheet" href="./canvas-frame.css"><link rel="stylesheet" href="./local-file-sync.css">
+  <link rel="stylesheet" href="./canvas-grid.css">
 </head>
 <body data-mode="paint">
   <header class="topbar" data-lg-light>
@@ -70,7 +71,14 @@
       </div><div class="canvas-stack">
       <section id="capture-panel" class="capture-panel" aria-label="区域截图设置" hidden></section>
       <div id="viewport" tabindex="0" aria-label="画布编辑区域"><canvas id="board" tabindex="0" aria-label="绘图画布"></canvas><div id="canvas-frame-controls" aria-label="画幅边界调整" hidden></div><div class="canvas-caption"><span id="canvas-file-caption">山野之间.png</span><span id="canvas-size-caption">960 × 640 px</span></div><div id="drop-overlay"><i data-icon="upload"></i><strong>放下图片，加入工作区</strong><span>支持多张图片与画境 / 拼境 / Pixelroom 工程</span></div><div id="text-editor-box" hidden><textarea id="text-editor" placeholder="输入文字…" aria-label="输入画布文字"></textarea><div><button id="text-cancel">取消</button><button id="text-apply">放置文字 ↵</button></div></div></div>
-      <div class="editor-bottom"><span><i data-icon="mouse"></i><span id="interaction-hint">拖动边框调整画幅 · 空格平移 · 滚轮缩放</span></span><button data-action="fit"><i data-icon="fit"></i>适应窗口</button><button data-action="actual">1:1</button></div></div></div>
+      <div class="editor-bottom">
+        <div class="canvas-grid-controls" role="group" aria-label="画布网格" title="网格只用于画布预览，不影响图片像素或导出">
+          <label class="canvas-grid-toggle" for="canvas-grid-visible"><input id="canvas-grid-visible" type="checkbox"><span>显示网格</span></label>
+          <label class="canvas-grid-spacing" for="grid-size"><span>间距</span><input id="grid-size" type="number" min="1" max="1024" step="1" value="1" inputmode="numeric" aria-label="网格间距" aria-describedby="canvas-grid-unit canvas-grid-hint"><span id="canvas-grid-unit">px</span></label>
+          <span id="canvas-grid-hint" role="status" aria-live="polite" hidden></span>
+        </div>
+        <span class="canvas-interaction-hint"><i data-icon="mouse"></i><span id="interaction-hint">拖动边框调整画幅 · 空格平移 · 滚轮缩放</span></span><button data-action="fit"><i data-icon="fit"></i>适应窗口</button><button data-action="actual">1:1</button>
+      </div></div></div>
       <div id="composer-host" class="mode-host" hidden></div><div id="tile-canvas-host" class="mode-host" hidden></div><div id="slicer-host" class="mode-host" hidden></div><div id="optimizer-host" class="mode-host" hidden></div><div id="padding-host" class="mode-host" hidden></div>
     </section>
     <aside class="inspector-panel">
@@ -80,7 +88,7 @@
         <div class="guide-intro"><span class="intro-icon"><i data-icon="link"></i></span><div><strong>一处放置，全局对齐</strong><p>参考点与参考线在所有素材间共享</p></div></div>
         <div class="guide-toolbar"><button data-tool="guide-point" title="放置参考点"><i data-icon="target"></i>参考点</button><button data-tool="guide-h" title="放置水平参考线"><i data-icon="hline"></i>水平线</button><button data-tool="guide-v" title="放置垂直参考线"><i data-icon="vline"></i>垂直线</button></div>
         <div class="guide-options"><label>定位方式<select id="reference-mode" aria-label="参考定位方式"><option value="pixel">像素坐标</option><option value="relative">相对比例</option></select></label><label class="switch-label"><span>显示参考</span><input id="show-guides" type="checkbox" checked role="switch"></label><label class="switch-label"><span>吸附到参考</span><input id="snap-guides" type="checkbox" checked role="switch"></label></div>
-        <div class="pixel-view-options"><label><input id="pixel-display" type="checkbox" checked>清晰像素显示</label><label>网格间距<input id="grid-size" type="number" min="1" max="1024" value="1">px</label></div><div class="section-heading"><span>工作区参考 <b id="guide-count">3</b></span><button class="icon-button" data-menu="guides" title="参考设置" aria-label="参考设置"><i data-icon="more"></i></button></div>
+        <div class="pixel-view-options"><label><input id="pixel-display" type="checkbox" checked>清晰像素显示</label></div><div class="section-heading"><span>工作区参考 <b id="guide-count">3</b></span><button class="icon-button" data-menu="guides" title="参考设置" aria-label="参考设置"><i data-icon="more"></i></button></div>
         <div id="guide-list" class="guide-list"></div>
         <div class="guide-tip"><i data-icon="info"></i><span>使用参考工具拖动位置，双击列表编辑坐标。锁定可防止误移。</span></div>
       </section>
