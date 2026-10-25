@@ -10,7 +10,7 @@ const boundaryMessage = '已到达画布边界，已保留全部图层像素。�
 export function createLayerMove(api) {
   let cached = null, drag = null, lastMove = null;
   const active = () => api.getState().tool === 'move' && ['paint', 'retouch'].includes(api.getState().mode);
-  const keepInside = () => api.getState().moveKeepInside !== false;
+  const keepInside = () => api.getState().moveKeepInside === true;
   const repaint = () => { api.renderSelectionStatus(); api.requestRender(); };
 
   function releaseDrag() {
@@ -105,7 +105,7 @@ export function createLayerMove(api) {
   function translatedBounds(item) {
     const b = item.bounds, x = b.x + item.dx, y = b.y + item.dy;
     if (x >= 0 && y >= 0 && x + b.width <= item.width && y + b.height <= item.height) return { ...b, x, y };
-    // When explicit clipping is enabled, derive the actual remaining alpha box
+    // Clipping is the default; derive the actual remaining alpha box
     // from the snapshot without another canvas readback.
     const left = Math.max(b.x, -item.dx), top = Math.max(b.y, -item.dy);
     const right = Math.min(b.x + b.width, item.width - item.dx), bottom = Math.min(b.y + b.height, item.height - item.dy);
