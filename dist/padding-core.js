@@ -1,4 +1,4 @@
-/* Integer geometry for transparent padding and nearest-neighbor resizing. */
+/* Integer output geometry for transparent padding and image resizing. */
 const MAX_SIDE = 8192;
 const MAX_PIXELS = 32 * 1024 * 1024;
 const MAX_RATIO = 10000;
@@ -91,30 +91,84 @@ export function planPadding(source, options = {}) {
   const bounds = validBounds(source.bounds, sourceWidth, sourceHeight);
   const mode = options.mode ?? 'ratio';
   if (mode === 'resize') {
-    const width = options.resizeWidth ?? 48;
-    const height = options.resizeHeight ?? 48;
-    dimensions(width, height, '目标');
-    const fit = options.resizeFit ?? 'stretch';
-    if (!['stretch', 'contain'].includes(fit)) {
-      throw new RangeError('缩放方式必须是直接拉伸或保持比例。');
+    const algorithm = options.resizeAlgorithm ?? 'nearest';
+    if (!['nearest', 'bilinear', 'bicubic', 'lanczos3', 'area'].includes(algorithm)) {
+      throw new RangeError('请选择有效的缩放采样算法。');
     }
-    let contentWidth = width, contentHeight = height;
-    if (fit === 'contain') {
-      const scale = Math.min(width / sourceWidth, height / sourceHeight);
-      contentWidth = clamp(roundEven(sourceWidth * scale), 1, width);
-      contentHeight = clamp(roundEven(sourceHeight * scale), 1, height);
+    const sizeMode = options.resizeSizeMode ?? 'dimensions';
+    if (!['dimensions', 'percent', 'width', 'height', 'long-edge'].includes(sizeMode)) {
+      throw new RangeError('缩放尺寸方式必须是指定宽高、百分比、宽度、高度或最长边。');
+    }
+    // Non-box controls always resize proportionally and ignore an inactive fit
+    // setting. Only the selected size input participates in validation.
+    const fit = sizeMode === 'dimensions' ? options.resizeFit ?? 'stretch' : 'inside';
+    let width, height, contentWidth, contentHeight, sourceRect;
+    if (sizeMode === 'dimensions') {
+      const targetWidth = integer(options.resizeWidth ?? 48, '目标宽度', 1, MAX_SIDE);
+      const targetHeight = integer(options.resizeHeight ?? 48, '目标高度', 1, MAX_SIDE);
+      if (!['stretch', 'contain', 'cover', 'inside'].includes(fit)) {
+        throw new RangeError('缩放方式必须是直接拉伸、等比补边、居中裁切或等比适应。');
+      }
+      width = contentWidth = targetWidth;
+      height = contentHeight = targetHeight;
+      if (fit === 'contain' || fit === 'inside') {
+        const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
+        contentWidth = clamp(roundEven(sourceWidth * scale), 1, targetWidth);
+        contentHeight = clamp(roundEven(sourceHeight * scale), 1, targetHeight);
+        if (fit === 'inside') { width = contentWidth; height = contentHeight; }
+      } else if (fit === 'cover') {
+        // Crop directly in source coordinates. An extreme aspect ratio must not
+        // require an oversized intermediate canvas before clipping the result.
+        const sourceIsWider = sourceWidth * targetHeight > sourceHeight * targetWidth;
+        const cropWidth = sourceIsWider ? sourceHeight * targetWidth / targetHeight : sourceWidth;
+        const cropHeight = sourceIsWider ? sourceHeight : sourceWidth * targetHeight / targetWidth;
+        sourceRect = {
+          x: (sourceWidth - cropWidth) / 2, y: (sourceHeight - cropHeight) / 2,
+          width: cropWidth, height: cropHeight,
+        };
+      }
+    } else if (sizeMode === 'percent') {
+      const percent = options.resizePercent ?? 100;
+      if (typeof percent !== 'number' || !Number.isFinite(percent) || percent < 0.1 || percent > 3200) {
+        throw new RangeError('缩放百分比必须是 0.1～3200 之间的有限数字。');
+      }
+      const scale = percent / 100;
+      width = Math.max(1, roundEven(sourceWidth * scale));
+      height = Math.max(1, roundEven(sourceHeight * scale));
+    } else if (sizeMode === 'width') {
+      width = integer(options.resizeWidth ?? 48, '目标宽度', 1, MAX_SIDE);
+      height = Math.max(1, roundEven(sourceHeight * (width / sourceWidth)));
+    } else if (sizeMode === 'height') {
+      height = integer(options.resizeHeight ?? 48, '目标高度', 1, MAX_SIDE);
+      width = Math.max(1, roundEven(sourceWidth * (height / sourceHeight)));
+    } else {
+      const edge = integer(options.resizeLongEdge ?? 256, '目标最长边', 1, MAX_SIDE);
+      const scale = edge / Math.max(sourceWidth, sourceHeight);
+      width = sourceWidth >= sourceHeight ? edge : Math.max(1, roundEven(sourceWidth * scale));
+      height = sourceHeight >= sourceWidth ? edge : Math.max(1, roundEven(sourceHeight * scale));
+    }
+    // Validate the actual output, not an unused inside bounding-box area or a
+    // nominal factor. No oversize proportional result is silently truncated.
+    dimensions(width, height, '目标');
+    if (sizeMode !== 'dimensions') {
+      contentWidth = width; contentHeight = height;
     }
     const offsetX = Math.floor((width - contentWidth) / 2);
     const offsetY = Math.floor((height - contentHeight) / 2);
+    const cropped = sourceRect && (sourceRect.x !== 0 || sourceRect.y !== 0 ||
+      sourceRect.width !== sourceWidth || sourceRect.height !== sourceHeight);
     return {
-      operation: 'resize', width, height, contentWidth, contentHeight,
-      scaleX: contentWidth / sourceWidth, scaleY: contentHeight / sourceHeight,
+      operation: 'resize', algorithm, sizeMode, resizeFit: fit,
+      width, height, contentWidth, contentHeight,
+      ...(sourceRect ? { sourceRect } : {}),
+      scaleX: contentWidth / (sourceRect?.width ?? sourceWidth),
+      scaleY: contentHeight / (sourceRect?.height ?? sourceHeight),
       offsetX, offsetY,
       left: offsetX, right: width - contentWidth - offsetX,
       top: offsetY, bottom: height - contentHeight - offsetY,
       centerX: sourceWidth / 2, centerY: sourceHeight / 2, empty: !bounds,
       changed: width !== sourceWidth || height !== sourceHeight ||
-        contentWidth !== sourceWidth || contentHeight !== sourceHeight,
+        contentWidth !== sourceWidth || contentHeight !== sourceHeight || Boolean(cropped),
       minWidth: 1, minHeight: 1,
     };
   }

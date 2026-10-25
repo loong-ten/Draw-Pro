@@ -82,7 +82,8 @@ test('resize defaults to 48 × 48 stretch, ignores padding controls, and reports
   const source = { width: 8, height: 3, bounds: { x: 0, y: 0, width: 1, height: 1 } };
   const plan = planPadding(source, { mode: 'resize', center: 'invalid', margin: 'ignored' });
   assert.deepEqual(plan, {
-    operation: 'resize', width: 48, height: 48, contentWidth: 48, contentHeight: 48,
+    operation: 'resize', algorithm: 'nearest', sizeMode: 'dimensions', resizeFit: 'stretch',
+    width: 48, height: 48, contentWidth: 48, contentHeight: 48,
     scaleX: 6, scaleY: 16, offsetX: 0, offsetY: 0, left: 0, right: 0, top: 0, bottom: 0,
     centerX: 4, centerY: 1.5, empty: false, changed: true, minWidth: 1, minHeight: 1,
   });
@@ -118,7 +119,7 @@ test('invalid resize parameters and oversized target canvases are rejected befor
       assert.throws(() => planPadding({ width: 3, height: 2 }, { mode: 'resize', [key]: value }), RangeError);
     }
   }
-  for (const resizeFit of ['cover', '', false, {}]) {
+  for (const resizeFit of ['invalid', '', false, {}]) {
     assert.throws(() => planPadding({ width: 3, height: 2 }, { mode: 'resize', resizeFit }), RangeError);
   }
   assert.throws(() => planPadding({ width: 3, height: 2 }, {
@@ -241,4 +242,177 @@ test('resize rolls back original document and history references if commit fails
   assert.throws(() => applyPaddingSnapshot(doc, source, plan), /test commit failure/);
   assert.deepEqual(stateOf(doc), before);
   for (const [key, value] of Object.entries(references)) assert.equal(doc[key], value, `${key} rolled back`);
+});
+
+test('inside returns the actual proportional dimensions with no border, matching independent Pillow contain fixtures', () => {
+  // Recorded from Pillow 12.3.0 ImageOps.contain(..., Resampling.NEAREST).
+  const fixtures = [
+    [5, 2, 5, 1, 2, 1], [7, 2, 5, 1, 4, 1], [3, 2, 8, 8, 8, 5],
+    [17, 11, 13, 7, 11, 7], [11, 17, 7, 13, 7, 11],
+    [9, 5, 5, 5, 5, 3], [5, 9, 5, 5, 3, 5], [7, 5, 10, 10, 10, 7],
+  ];
+  for (const [width, height, resizeWidth, resizeHeight, expectedWidth, expectedHeight] of fixtures) {
+    const source = Object.freeze({ width, height });
+    const options = Object.freeze({ mode: 'resize', resizeFit: 'inside', resizeWidth, resizeHeight });
+    const plan = planPadding(source, options);
+    assert.deepEqual([plan.width, plan.height, plan.contentWidth, plan.contentHeight],
+      [expectedWidth, expectedHeight, expectedWidth, expectedHeight]);
+    assert.deepEqual([plan.offsetX, plan.offsetY, plan.left, plan.right, plan.top, plan.bottom], [0, 0, 0, 0, 0, 0]);
+    assert.deepEqual([plan.centerX, plan.centerY, plan.scaleX, plan.scaleY],
+      [width / 2, height / 2, expectedWidth / width, expectedHeight / height]);
+    assert.equal('sourceRect' in plan, false);
+  }
+  const narrow = planPadding({ width: 8192, height: 1 }, {
+    mode: 'resize', resizeFit: 'inside', resizeWidth: 8192, resizeHeight: 8192,
+  });
+  assert.deepEqual([narrow.width, narrow.height], [8192, 1], 'only the actual output consumes the pixel budget');
+  assert.equal(narrow.changed, false);
+});
+
+test('cover plans centered source-coordinate crops across parity and extreme aspect ratios without an intermediate canvas', () => {
+  const fixtures = [
+    [7, 3, 4, 4, { x: 2, y: 0, width: 3, height: 3 }],
+    [5, 2, 3, 4, { x: 1.75, y: 0, width: 1.5, height: 2 }],
+    [3, 5, 4, 3, { x: 0, y: 1.375, width: 3, height: 2.25 }],
+    [7, 4, 5, 5, { x: 1.5, y: 0, width: 4, height: 4 }],
+    [4, 7, 5, 5, { x: 0, y: 1.5, width: 4, height: 4 }],
+    [4, 3, 8, 6, { x: 0, y: 0, width: 4, height: 3 }],
+    [8192, 1, 1, 8192, { x: 4096 - 1 / 16384, y: 0, width: 1 / 8192, height: 1 }],
+    [1, 8192, 8192, 1, { x: 0, y: 4096 - 1 / 16384, width: 1, height: 1 / 8192 }],
+  ];
+  for (const [width, height, resizeWidth, resizeHeight, crop] of fixtures) {
+    const plan = planPadding({ width, height, bounds: { x: 0, y: 0, width: 1, height: 1 } }, {
+      mode: 'resize', resizeFit: 'cover', resizeWidth, resizeHeight, center: 'content', margin: 9999,
+    });
+    assert.deepEqual(plan.sourceRect, crop);
+    assert.deepEqual([plan.width, plan.height, plan.contentWidth, plan.contentHeight],
+      [resizeWidth, resizeHeight, resizeWidth, resizeHeight]);
+    assert.deepEqual([plan.offsetX, plan.offsetY, plan.left, plan.right, plan.top, plan.bottom], [0, 0, 0, 0, 0, 0]);
+    assert.equal(plan.scaleX, resizeWidth / crop.width); assert.equal(plan.scaleY, resizeHeight / crop.height);
+    assert.ok(Math.abs(plan.scaleX - plan.scaleY) <= 1e-12, 'cover has one proportional scale');
+    assert.equal(crop.x + crop.width / 2, width / 2); assert.equal(crop.y + crop.height / 2, height / 2);
+    assert.ok(crop.width > 0 && crop.height > 0 && crop.x >= 0 && crop.y >= 0);
+    assert.ok(crop.x + crop.width <= width && crop.y + crop.height <= height);
+    assert.equal(plan.changed, true);
+  }
+  const identity = planPadding({ width: 7, height: 5 }, {
+    mode: 'resize', resizeFit: 'cover', resizeWidth: 7, resizeHeight: 5,
+  });
+  assert.equal(identity.changed, false);
+  assert.deepEqual(identity.sourceRect, { x: 0, y: 0, width: 7, height: 5 });
+});
+
+test('percent operates on each source independently and preserves ties-to-even at half pixels', () => {
+  // Recorded independently from Pillow 12.3.0 ImageOps.scale for these inputs.
+  const fixtures = [
+    [5, 7, 50, 2, 4], [7, 5, 50, 4, 2], [641, 479, 33.3, 213, 160],
+    [12, 9, 125, 15, 11], [3, 5, 150, 4, 8], [17, 11, 200, 34, 22],
+  ];
+  for (const [width, height, resizePercent, expectedWidth, expectedHeight] of fixtures) {
+    const plan = planPadding({ width, height }, { mode: 'resize', resizeSizeMode: 'percent', resizePercent });
+    assert.deepEqual([plan.width, plan.height], [expectedWidth, expectedHeight]);
+    assert.deepEqual([plan.contentWidth, plan.contentHeight], [expectedWidth, expectedHeight]);
+    assert.deepEqual([plan.left, plan.right, plan.top, plan.bottom], [0, 0, 0, 0]);
+    assert.equal(plan.scaleX, expectedWidth / width); assert.equal(plan.scaleY, expectedHeight / height);
+  }
+  const defaults = planPadding({ width: 17, height: 11 }, { mode: 'resize', resizeSizeMode: 'percent' });
+  assert.deepEqual([defaults.width, defaults.height, defaults.changed], [17, 11, false]);
+  const tiny = planPadding({ width: 8, height: 3 }, { mode: 'resize', resizeSizeMode: 'percent', resizePercent: 0.1 });
+  assert.deepEqual([tiny.width, tiny.height], [1, 1], 'a tiny percentage cannot create a zero-sized canvas');
+});
+
+test('single-edge and longest-edge modes honor their exact edge and independently round the proportional edge', () => {
+  const fixtures = [
+    [2, 5, 'width', 1, 1, 2], [2, 7, 'width', 1, 1, 4],
+    [5, 2, 'height', 1, 2, 1], [7, 2, 'height', 1, 4, 1],
+    [7, 5, 'width', 10, 10, 7], [5, 7, 'height', 10, 7, 10],
+    [11, 7, 'long-edge', 6, 6, 4], [7, 11, 'long-edge', 6, 4, 6],
+    [9, 9, 'long-edge', 6, 6, 6], [8192, 1, 'long-edge', 1, 1, 1],
+    [1, 8192, 'long-edge', 1, 1, 1],
+  ];
+  for (const [width, height, resizeSizeMode, value, expectedWidth, expectedHeight] of fixtures) {
+    const key = { width: 'resizeWidth', height: 'resizeHeight', 'long-edge': 'resizeLongEdge' }[resizeSizeMode];
+    const plan = planPadding({ width, height }, { mode: 'resize', resizeSizeMode, [key]: value });
+    assert.deepEqual([plan.width, plan.height, plan.contentWidth, plan.contentHeight],
+      [expectedWidth, expectedHeight, expectedWidth, expectedHeight]);
+    assert.deepEqual([plan.offsetX, plan.offsetY, plan.left, plan.right, plan.top, plan.bottom], [0, 0, 0, 0, 0, 0]);
+    assert.equal('sourceRect' in plan, false);
+  }
+  const defaults = planPadding({ width: 640, height: 480 }, { mode: 'resize', resizeSizeMode: 'long-edge' });
+  assert.deepEqual([defaults.width, defaults.height], [256, 192]);
+  for (const [resizeSizeMode, key, value] of [['width', 'resizeWidth', 7], ['height', 'resizeHeight', 5], ['long-edge', 'resizeLongEdge', 7]]) {
+    assert.equal(planPadding({ width: 7, height: 5 }, { mode: 'resize', resizeSizeMode, [key]: value }).changed, false);
+  }
+});
+
+test('inactive fit and size controls do not affect proportional modes, while every supported algorithm is preserved', () => {
+  const source = { width: 6, height: 4 };
+  for (const resizeSizeMode of ['percent', 'width', 'height', 'long-edge']) {
+    const baseline = { mode: 'resize', resizeSizeMode };
+    const unused = { resizeFit: 'invalid-but-inactive' };
+    if (resizeSizeMode !== 'width') unused.resizeWidth = NaN;
+    if (resizeSizeMode !== 'height') unused.resizeHeight = -8;
+    if (resizeSizeMode !== 'percent') unused.resizePercent = Infinity;
+    if (resizeSizeMode !== 'long-edge') unused.resizeLongEdge = 'invalid';
+    assert.deepEqual(planPadding(source, { ...baseline, ...unused }), planPadding(source, baseline));
+    assert.equal(planPadding(source, baseline).resizeFit, 'inside');
+  }
+  for (const resizeAlgorithm of ['nearest', 'bilinear', 'bicubic', 'lanczos3', 'area']) {
+    const plan = planPadding(source, { mode: 'resize', resizeAlgorithm });
+    assert.equal(plan.algorithm, resizeAlgorithm);
+    assert.deepEqual([plan.width, plan.height], [48, 48]);
+  }
+});
+
+test('new size modes validate active inputs and reject final dimensions or areas beyond the existing limits', () => {
+  const source = { width: 3, height: 2 };
+  for (const resizeSizeMode of ['', 'scale', false, 1, {}]) {
+    assert.throws(() => planPadding(source, { mode: 'resize', resizeSizeMode }), RangeError);
+  }
+  for (const resizeAlgorithm of ['', 'smooth', 'lanczos', false, 1, {}]) {
+    assert.throws(() => planPadding(source, { mode: 'resize', resizeAlgorithm }), RangeError);
+  }
+  for (const resizePercent of [NaN, Infinity, -Infinity, 0, -1, 0.099, 3200.001, '100', true]) {
+    assert.throws(() => planPadding(source, { mode: 'resize', resizeSizeMode: 'percent', resizePercent }), RangeError);
+  }
+  for (const [resizeSizeMode, key] of [['width', 'resizeWidth'], ['height', 'resizeHeight'], ['long-edge', 'resizeLongEdge']]) {
+    for (const value of [NaN, Infinity, 0, -1, 1.5, 8193, '48', true]) {
+      assert.throws(() => planPadding(source, { mode: 'resize', resizeSizeMode, [key]: value }), RangeError);
+    }
+  }
+  const oversized = [
+    [{ width: 1, height: 8192 }, { resizeSizeMode: 'width', resizeWidth: 2 }],
+    [{ width: 8192, height: 1 }, { resizeSizeMode: 'height', resizeHeight: 2 }],
+    [{ width: 257, height: 1 }, { resizeSizeMode: 'percent', resizePercent: 3200 }],
+    [{ width: 256, height: 129 }, { resizeSizeMode: 'percent', resizePercent: 3200 }],
+    [{ width: 1, height: 1 }, { resizeSizeMode: 'long-edge', resizeLongEdge: 8192 }],
+    [{ width: 1, height: 1 }, { resizeFit: 'inside', resizeWidth: 8192, resizeHeight: 8192 }],
+    [{ width: 1, height: 1 }, { resizeFit: 'cover', resizeWidth: 8192, resizeHeight: 4097 }],
+  ];
+  for (const [input, options] of oversized) assert.throws(() => planPadding(input, { mode: 'resize', ...options }), RangeError);
+  const limits = [
+    [{ width: 256, height: 128 }, { resizeSizeMode: 'percent', resizePercent: 3200 }],
+    [{ width: 2, height: 1 }, { resizeSizeMode: 'width', resizeWidth: 8192 }],
+    [{ width: 2, height: 1 }, { resizeSizeMode: 'long-edge', resizeLongEdge: 8192 }],
+    [{ width: 1, height: 1 }, { resizeFit: 'cover', resizeWidth: 8192, resizeHeight: 4096 }],
+  ];
+  for (const [input, options] of limits) {
+    const plan = planPadding(input, { mode: 'resize', ...options });
+    assert.deepEqual([plan.width, plan.height], [8192, 4096]);
+  }
+});
+
+test('pure padding modes completely ignore resize geometry and algorithm options', () => {
+  const source = { width: 7, height: 5, bounds: { x: 1, y: 1, width: 3, height: 2 } };
+  const unrelated = { resizeSizeMode: 'invalid', resizeFit: false, resizeAlgorithm: 'invalid',
+    resizeWidth: NaN, resizeHeight: Infinity, resizePercent: -1, resizeLongEdge: 'bad' };
+  for (const options of [
+    { mode: 'ratio', ratioWidth: 4, ratioHeight: 3, margin: 2 },
+    { mode: 'scale', scale: 2, margin: 1 },
+    { mode: 'size', targetWidth: 20, targetHeight: 16, center: 'canvas' },
+  ]) {
+    const oldPlan = planPadding(source, options);
+    assert.deepEqual(planPadding(source, { ...options, ...unrelated }), oldPlan);
+    assert.equal('algorithm' in oldPlan, false); assert.equal('sourceRect' in oldPlan, false);
+  }
 });

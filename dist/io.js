@@ -1,5 +1,6 @@
 import { PaintDocument, makeCanvas, composite } from './core.js';
 import { normalizeBlend } from './core.js';
+import { normalizeCanvasBackground } from './transparency-background.js';
 
 // All image and project data stays in the browser. A directory is written only
 // after the user opens a writable directory and saves or enables local sync.
@@ -581,7 +582,7 @@ function validateGuides(input) {
 function validateSettings(input = {}) {
   const result = {};
   // Preserve simple UI preferences without allowing prototype-bearing objects.
-  for (const key of ['referenceMode', 'baseWidth', 'baseHeight', 'activeDocId', 'showGuides', 'snapToGuides', 'showGrid', 'gridSize', 'workspaceName', 'zoom', 'theme', 'pixelDisplay']) {
+  for (const key of ['referenceMode', 'baseWidth', 'baseHeight', 'activeDocId', 'showGuides', 'snapToGuides', 'showGrid', 'gridSize', 'workspaceName', 'zoom', 'theme', 'pixelDisplay', 'canvasBackground']) {
     const value = input?.[key];
     if (typeof value === 'boolean' || typeof value === 'string' && value.length < 500 || typeof value === 'number' && Number.isFinite(value)) result[key] = value;
   }
@@ -592,6 +593,7 @@ function validateSettings(input = {}) {
   if (!validHeight) result.baseHeight = 640;
   if (!validWidth || !validHeight) result.referenceMode = 'pixel';
   result.gridSize = typeof result.gridSize === 'number' && Number.isFinite(result.gridSize) && result.gridSize >= 1 && result.gridSize <= 1024 ? Math.round(result.gridSize) : 1;
+  result.canvasBackground = normalizeCanvasBackground(result.canvasBackground);
   result.moveAutoSelect = input?.moveAutoSelect === true;
   result.moveKeepInside = input?.moveKeepInside !== false;
   if (input.workbench && typeof input.workbench === 'object' && !Array.isArray(input.workbench)) {

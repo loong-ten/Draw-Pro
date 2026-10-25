@@ -13,6 +13,7 @@ import {createLayerMove} from './layer-move.js';
 import {createCanvasFrame} from './canvas-frame.js';
 import {createLocalFileSync} from './local-file-sync.js';
 import {prepareWorkspaceDocuments,createDocumentCopy} from './workspace-documents.js';
+import {drawTransparencyBackground,normalizeCanvasBackground} from './transparency-background.js';
 let workbench = null, regionCapture = null, layerMove = null, canvasFrame = null, localFileSync = null;
 let localSaveTask = null, workspaceApplying = false, lastSyncError = null;
 
@@ -24,7 +25,7 @@ const toolNames={move:'移动图层',capture:'区域截图',brush:'画笔',penci
 Object.assign(toolNames,{leftarrow:'左箭头',uparrow:'上箭头',downarrow:'下箭头',righttriangle:'直角三角形',star4:'四角星',star6:'六角星',lightning:'闪电',cloud:'云朵',ovalcallout:'椭圆标注',burst:'爆炸星形'});
 const shapeTools=['line','curve','rect','roundrect','ellipse','triangle','diamond','pentagon','hexagon','star','arrow','heart','speech','polygon','leftarrow','uparrow','downarrow','righttriangle','star4','star6','lightning','cloud','ovalcallout','burst'];
 const colors=['#30443b','#73816a','#a6ad93','#d2d5c6','#ffffff','#e88248','#e8ae62','#f0d79a','#d06b5c','#c99198','#435d72','#7299ab','#a5c6c7','#d8e6df','#f7efdc','#698957','#8eb07f','#bcd1a8','#997d69','#b6a9c5'];
-const state={localSyncEnabled:true,mode:'paint',moveAutoSelect:false,moveKeepInside:true,pixelDisplay:true,docs:createDemoDocuments(),activeId:null,tool:'brush',brush:'round',color:'#30443b',secondary:'#ffffff',size:4,opacity:1,tolerance:30,fill:'none',outline:true,guides:[{id:uid(),type:'h',x:0,y:420,label:'地面基准线',color:'#de995f',locked:false,visible:true},{id:uid(),type:'v',x:480,y:0,label:'画面中心线',color:'#7c9e99',locked:false,visible:true},{id:uid(),type:'point',x:480,y:420,label:'中心锚点',color:'#de995f',locked:false,visible:true}],showGuides:true,snapToGuides:true,referenceMode:'pixel',baseWidth:960,baseHeight:640,showGrid:false,gridSize:1,showRulers:true,selectedGuide:null,directory:null,workspaceName:'我的创作工作区',selection:null,clipboard:null,gesture:null,polygon:null,curve:null,space:false,pointer:null,textPosition:null,bold:false,italic:false,underline:false,transparentSelection:false,guideHistory:[],guideHistoryIndex:0,lastAction:'image',draftTimer:null};
+const state={localSyncEnabled:true,mode:'paint',moveAutoSelect:false,moveKeepInside:true,pixelDisplay:true,canvasBackground:'checker',docs:createDemoDocuments(),activeId:null,tool:'brush',brush:'round',color:'#30443b',secondary:'#ffffff',size:4,opacity:1,tolerance:30,fill:'none',outline:true,guides:[{id:uid(),type:'h',x:0,y:420,label:'地面基准线',color:'#de995f',locked:false,visible:true},{id:uid(),type:'v',x:480,y:0,label:'画面中心线',color:'#7c9e99',locked:false,visible:true},{id:uid(),type:'point',x:480,y:420,label:'中心锚点',color:'#de995f',locked:false,visible:true}],showGuides:true,snapToGuides:true,referenceMode:'pixel',baseWidth:960,baseHeight:640,showGrid:false,gridSize:1,showRulers:true,selectedGuide:null,directory:null,workspaceName:'我的创作工作区',selection:null,clipboard:null,gesture:null,polygon:null,curve:null,space:false,pointer:null,textPosition:null,bold:false,italic:false,underline:false,transparentSelection:false,guideHistory:[],guideHistoryIndex:0,lastAction:'image',draftTimer:null};
 state.activeId=state.docs[0].id;
 const doc=()=>state.docs.find(d=>d.id===state.activeId);
 let scheduled=false,toastTimer,renderSideTimer,autosaveDisabled=false,lastDraftError=0;
@@ -35,7 +36,7 @@ function assertSlicerIdle(){if(workbench?.slicer?.isBusy?.())throw Error('正在
 function blockSlicerEdit(){try{assertSlicerIdle();return false}catch(error){toast(error.message);return true}}
 async function ask(title,html,{submit='确定',cancel='取消',width='440px'}={}){canvasFrame?.cancel();layerMove?.cancel();closeMenu();const d=$('#dialog');if(d.open)d.close();$('#dialog-title').textContent=title;$('#dialog-body').innerHTML=html;$('#dialog-submit').textContent=submit;$('#dialog-cancel').textContent=cancel;$('#dialog-submit').hidden=!submit;$('#dialog-cancel').hidden=!cancel;d.style.width=width;d.returnValue='';d.showModal();return new Promise(resolve=>{let done=false;const finish=value=>{if(done)return;done=true;d.removeEventListener('close',onClose);$('#dialog-form').removeEventListener('submit',onSubmit);d.close();resolve(value)};const onClose=()=>finish(null);const onSubmit=e=>{e.preventDefault();finish(Object.fromEntries(new FormData($('#dialog-form'))))};$('#dialog-form').addEventListener('submit',onSubmit);d.addEventListener('close',onClose);$('#dialog-cancel').onclick=()=>finish(null);$('#dialog-close').onclick=()=>finish(null);setTimeout(()=>$('#dialog-body input:not([type=checkbox]),#dialog-body select')?.focus(),30)})}
 const row=(label,input)=>`<div class="form-row"><label>${label}</label>${input}</div>`;
-function settings(){return{localSyncEnabled:state.localSyncEnabled,moveAutoSelect:state.moveAutoSelect,moveKeepInside:state.moveKeepInside,referenceMode:state.referenceMode,baseWidth:state.baseWidth,baseHeight:state.baseHeight,activeDocId:state.activeId,showGuides:state.showGuides,snapToGuides:state.snapToGuides,showGrid:state.showGrid,gridSize:state.gridSize,workspaceName:state.workspaceName,pixelDisplay:state.pixelDisplay,workbench:workbench?.serialize()}}
+function settings(){return{localSyncEnabled:state.localSyncEnabled,moveAutoSelect:state.moveAutoSelect,moveKeepInside:state.moveKeepInside,referenceMode:state.referenceMode,baseWidth:state.baseWidth,baseHeight:state.baseHeight,activeDocId:state.activeId,showGuides:state.showGuides,snapToGuides:state.snapToGuides,showGrid:state.showGrid,gridSize:state.gridSize,workspaceName:state.workspaceName,pixelDisplay:state.pixelDisplay,canvasBackground:state.canvasBackground,workbench:workbench?.serialize()}}
 function renderLocalSync(status=localFileSync?.getStatus()){
   const connected=!!state.directory,enabled=state.localSyncEnabled!==false;
   const panel=$('#local-file-sync'),toggle=$('#local-sync-enabled'),note=$('#local-sync-status'),button=$('#local-sync-now');
@@ -85,7 +86,10 @@ function inheritDocumentZoom(target,z=doc()?.view?.z){
   target.view={...previous,z,x:cx-ix*z,y:cy-iy*z,fit:false};
 }
 function gridStep(value=state.gridSize){return clamp(Math.round(Number(value)||1),1,1024)}
+function renderCanvasBackgroundControl(){const select=$('#canvas-background');if(select)select.value=normalizeCanvasBackground(state.canvasBackground)}
+function setCanvasBackground(value){state.canvasBackground=normalizeCanvasBackground(value);renderCanvasBackgroundControl();requestRender();workbench?.padding?.refreshBackground?.();persist({sync:false})}
 function renderGridControls(v=doc()?.view){
+  renderCanvasBackgroundControl();
   const enabled=!!state.showGrid,step=gridStep(),painting=['paint','retouch'].includes(state.mode);
   const toggle=$('#canvas-grid-visible'),input=$('#grid-size'),hint=$('#canvas-grid-hint');
   if(toggle)toggle.checked=enabled;
@@ -104,7 +108,7 @@ function storePosition(g,p){g.x=Math.round(state.referenceMode==='relative'?p.x/
 function snap(p,exclude=null){const q={...p};if(!state.snapToGuides||!state.showGuides)return q;const threshold=7/getView().z;let dx=threshold,dy=threshold;for(const g of state.guides){if(!g.visible||g.id===exclude)continue;const v=guidePosition(g);if((g.type==='v'||g.type==='point')&&Math.abs(p.x-v.x)<dx){q.x=v.x;dx=Math.abs(p.x-v.x)}if((g.type==='h'||g.type==='point')&&Math.abs(p.y-v.y)<dy){q.y=v.y;dy=Math.abs(p.y-v.y)}}return q}
 function hitGuide(p){if(!state.showGuides)return null;const threshold=6/getView().z;return [...state.guides].reverse().find(g=>{if(!g.visible||g.locked)return false;const a=guidePosition(g);return g.type==='point'?Math.hypot(p.x-a.x,p.y-a.y)<threshold*1.6:g.type==='h'?Math.abs(p.y-a.y)<threshold:Math.abs(p.x-a.x)<threshold})}
 function renderCanvas(){if(!['paint','retouch'].includes(state.mode))return;const d=doc();if(!d)return;const w=viewport.clientWidth,h=viewport.clientHeight,dpr=window.devicePixelRatio||1;if(board.width!==Math.round(w*dpr)||board.height!==Math.round(h*dpr)){board.width=Math.round(w*dpr);board.height=Math.round(h*dpr)}if(!d.view||d.view.fit)fit(false);const v=d.view,frame=canvasFrame?.getPreview()||{x:0,y:0,width:d.width,height:d.height},fx=v.x+frame.x*v.z,fy=v.y+frame.y*v.z,fw=frame.width*v.z,fh=frame.height*v.z;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle='#191c20';ctx.fillRect(0,0,w,h);ctx.fillStyle='#34383e';for(let x=10;x<w;x+=20)for(let y=12;y<h;y+=20)ctx.fillRect(x,y,1,1);
-  ctx.save();ctx.shadowColor='#00000060';ctx.shadowBlur=16;ctx.shadowOffsetY=6;ctx.fillStyle='#fff';ctx.fillRect(fx,fy,fw,fh);ctx.restore();ctx.save();ctx.beginPath();ctx.rect(fx,fy,fw,fh);ctx.clip();ctx.fillStyle='#fff';ctx.fillRect(fx,fy,fw,fh);ctx.fillStyle='#e5e7e9';const cs=10;for(let x=Math.max(0,Math.floor(fx/cs)*cs);x<Math.min(w,fx+fw);x+=cs)for(let y=Math.max(0,Math.floor(fy/cs)*cs);y<Math.min(h,fy+fh);y+=cs)if((Math.floor(x/cs)+Math.floor(y/cs))%2===0)ctx.fillRect(x,y,cs,cs);ctx.imageSmoothingEnabled=state.pixelDisplay===false;ctx.drawImage(displayComposite(),v.x,v.y,d.width*v.z,d.height*v.z);
+  ctx.save();ctx.shadowColor='#00000060';ctx.shadowBlur=16;ctx.shadowOffsetY=6;ctx.fillStyle='#fff';ctx.fillRect(fx,fy,fw,fh);ctx.restore();ctx.save();ctx.beginPath();ctx.rect(fx,fy,fw,fh);ctx.clip();drawTransparencyBackground(ctx,{x:fx,y:fy,width:fw,height:fh},state.canvasBackground);ctx.imageSmoothingEnabled=state.pixelDisplay===false;ctx.drawImage(displayComposite(),v.x,v.y,d.width*v.z,d.height*v.z);
   const step=gridStep();if(state.showGrid&&step*v.z>=GRID_MIN_SCREEN_PX){ctx.beginPath();const x0=Math.max(0,Math.floor(-v.x/v.z/step)*step),x1=Math.min(d.width,(w-v.x)/v.z);const y0=Math.max(0,Math.floor(-v.y/v.z/step)*step),y1=Math.min(d.height,(h-v.y)/v.z);for(let x=x0;x<=x1;x+=step){ctx.moveTo(v.x+x*v.z,v.y);ctx.lineTo(v.x+x*v.z,v.y+d.height*v.z)}for(let y=y0;y<=y1;y+=step){ctx.moveTo(v.x,v.y+y*v.z);ctx.lineTo(v.x+d.width*v.z,v.y+y*v.z)}ctx.strokeStyle='#5e778a70';ctx.lineWidth=.65;ctx.stroke()}
   ctx.restore();ctx.strokeStyle='#535a66';ctx.lineWidth=.5;ctx.strokeRect(fx-.5,fy-.5,fw+1,fh+1);
   if(state.showGuides){for(const g of state.guides){if(!g.visible)continue;const p=guidePosition(g),x=v.x+p.x*v.z,y=v.y+p.y*v.z;ctx.save();ctx.strokeStyle=g.color;ctx.fillStyle=g.color;ctx.lineWidth=g.id===state.selectedGuide?1.5:1;ctx.setLineDash(g.locked?[2,4]:[6,5]);ctx.globalAlpha=.85;if(g.type==='h'){ctx.beginPath();ctx.moveTo(state.showRulers?24:0,y);ctx.lineTo(w,y);ctx.stroke();label(`${Math.round(p.y)}`,Math.max(29,v.x-34),y-5,g.color)}else if(g.type==='v'){ctx.beginPath();ctx.moveTo(x,state.showRulers?24:0);ctx.lineTo(x,h);ctx.stroke();label(`${Math.round(p.x)}`,x+5,Math.max(40,v.y-9),g.color)}else{ctx.setLineDash([]);ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.moveTo(x-10,y);ctx.lineTo(x+10,y);ctx.moveTo(x,y-10);ctx.lineTo(x,y+10);ctx.stroke();label(g.label,x+11,y-11,g.color)}ctx.restore()}}
@@ -281,8 +285,8 @@ async function openDirectoryWorkspace(directory,operation=beginDirectoryOpen()){
   const documents=imported.docs.length?imported.docs:[new PaintDocument({name:'未命名.png',width:960,height:640,fill:'transparent'})];
   const name=String(directory.name||'新工作区').slice(0,100);
   const first=documents[0];
-  const preferences={referenceMode:'pixel',baseWidth:first.width,baseHeight:first.height,showGuides:true,snapToGuides:true,showGrid:false,gridSize:1,pixelDisplay:true,moveAutoSelect:false,moveKeepInside:true};
-  for(const key of ['referenceMode','baseWidth','baseHeight','showGuides','snapToGuides','showGrid','gridSize','pixelDisplay']){
+  const preferences={referenceMode:'pixel',baseWidth:first.width,baseHeight:first.height,showGuides:true,snapToGuides:true,showGrid:false,gridSize:1,pixelDisplay:true,canvasBackground:'checker',moveAutoSelect:false,moveKeepInside:true};
+  for(const key of ['referenceMode','baseWidth','baseHeight','showGuides','snapToGuides','showGrid','gridSize','pixelDisplay','canvasBackground']){
     if(refs?.settings?.[key]!==undefined)preferences[key]=refs.settings[key];
   }
   const pending=state.selection?.float||state.gesture||state.curve||state.polygon||!$('#text-editor-box').hidden;
@@ -378,6 +382,7 @@ async function applyWorkspace(result){
   const {workbench:savedWorkbench,...preferences}=result.settings||{};
   await workbench?.restore(savedWorkbench||{});
   state.docs=result.docs;state.guides=result.guides;Object.assign(state,preferences);
+  state.canvasBackground=['studio','checker','transparent'].includes(preferences.canvasBackground)?preferences.canvasBackground:'checker';
   state.activeId=state.docs.some(d=>d.id===preferences.activeDocId)?preferences.activeDocId:state.docs[0].id;
   state.selection=null;state.gesture=null;state.curve=null;state.polygon=null;state.directory=null;state.workspaceDirty=false;
   state.guideHistory=[captureRefs()];state.guideHistoryIndex=0;
@@ -513,6 +518,7 @@ $('#layer-opacity').oninput=e=>{layerMove?.cancel();workbench?.deactivate();doc(
 $('#move-auto-select').onchange=e=>{layerMove?.cancel();state.moveAutoSelect=e.target.checked;renderTools();persist()};
 $('#move-keep-inside').onchange=e=>{layerMove?.cancel();state.moveKeepInside=e.target.checked;renderTools();persist()};
 $('#canvas-grid-visible').onchange=e=>setGridVisible(e.target.checked);
+$('#canvas-background').onchange=e=>setCanvasBackground(e.target.value);
 $('#grid-size').oninput=e=>{if(e.target.value!==''&&e.target.validity.valid)setGridSize(e.target.value)};
 $('#grid-size').onchange=e=>{setGridSize(e.target.value);e.target.value=state.gridSize};
 $('#brush-size').oninput=e=>{state.size=clamp(Math.round(+e.target.value)||1,1,500);$('#ribbon-size').textContent=state.size};$('#brush-size').onchange=renderTools;$('#brush-opacity').oninput=e=>{state.opacity=+e.target.value/100;$('#opacity-value').textContent=e.target.value+'%'};$('#tolerance').oninput=e=>state.tolerance=clamp(+e.target.value,0,255);$('#shape-fill').onchange=e=>state.fill=e.target.value;$('#shape-outline').onchange=e=>state.outline=e.target.value==='true';$('#zoom-range').oninput=e=>setZoom(2**+e.target.value);
@@ -538,7 +544,7 @@ $('#shapes-grid').innerHTML=shapeTools.slice(0,14).map(s=>`<button data-tool="${
 workbench=installWorkbench({
  getDoc:doc,getDocs:()=>state.docs,getState:()=>state,getComposite:cached,getView,viewport,board,
  setView:v=>{canvasFrame?.cancel();layerMove?.cancel();Object.assign(getView(),{fit:false},v);requestRender();renderZoom()},
- requestRender,finishPending,refresh:renderUI,invalidate,commit:changed,toast,ask,action,addDocument,addDocuments,applyLayer,applyOptimizedDocument,commitLayerCanvas,restoreHistory,
+ requestRender,finishPending,refresh:renderUI,invalidate,commit:changed,toast,ask,action,addDocument,addDocuments,applyLayer,applyOptimizedDocument,commitLayerCanvas,restoreHistory,setCanvasBackground,
  setColor:hex=>{if(/^#[0-9a-f]{6}$/i.test(hex)){state.color=hex;renderTools()}},
  persist:()=>{state.workspaceDirty=true;persist()}
 });
