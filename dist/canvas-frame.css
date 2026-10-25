@@ -1,0 +1,23 @@
+/* The resize border is editor chrome; it never becomes part of the image. */
+#canvas-frame-controls{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden;user-select:none}
+#canvas-frame-controls[hidden]{display:none}
+.canvas-frame-outline{position:absolute;border:1px solid #a8bfd080;pointer-events:none;box-sizing:border-box}
+#canvas-frame-controls .canvas-frame-handle{position:absolute;display:flex;align-items:center;justify-content:center;padding:0;margin:0;border:0;border-radius:0;background:transparent;box-shadow:none;transform:translate(-50%,-50%);pointer-events:auto;touch-action:none;transition:none}
+#canvas-frame-controls .canvas-frame-handle:hover,#canvas-frame-controls .canvas-frame-handle:active{background:transparent;transform:translate(-50%,-50%);box-shadow:none}
+#canvas-frame-controls .canvas-frame-handle span{display:block;flex:none;width:9px;height:9px;border:1.5px solid #4c6c8d;border-radius:2px;background:#f3f8ff;box-shadow:0 1px 4px #0006;pointer-events:none;transition:background .12s,border-color .12s}
+#canvas-frame-controls .canvas-frame-handle:hover span,#canvas-frame-controls .canvas-frame-handle:focus-visible span{background:#5ba6ff;border-color:#eef6ff;box-shadow:0 0 0 2px #142d50a0}
+#canvas-frame-controls .canvas-frame-handle:focus-visible{outline:1px solid #9bc6ff;outline-offset:-2px}
+.canvas-frame-handle.frame-n,.canvas-frame-handle.frame-s{cursor:ns-resize}
+.canvas-frame-handle.frame-e,.canvas-frame-handle.frame-w{cursor:ew-resize}
+.canvas-frame-handle.frame-nw,.canvas-frame-handle.frame-se{cursor:nwse-resize;z-index:2}
+.canvas-frame-handle.frame-ne,.canvas-frame-handle.frame-sw{cursor:nesw-resize;z-index:2}
+#canvas-frame-controls:has(.canvas-frame-handle:hover) .canvas-frame-outline,#canvas-frame-controls.is-dragging .canvas-frame-outline{border-color:#83b9ff}
+#canvas-frame-controls.is-dragging .canvas-frame-outline{border-style:dashed}
+#canvas-frame-controls.is-invalid .canvas-frame-outline{border-color:#f49580}
+.canvas-frame-readout{position:absolute;transform:translateX(-50%);padding:7px 11px;max-width:calc(100% - 16px);border:1px solid #b5cee35c;border-radius:8px;background:#182435f2;color:#eef5ff;font-size:11px;line-height:1.4;white-space:nowrap;box-shadow:0 3px 12px #0005;pointer-events:none;font-variant-numeric:tabular-nums}
+.canvas-frame-readout[hidden]{display:none}
+#canvas-frame-controls.is-invalid .canvas-frame-readout{border-color:#e6a38d;color:#ffd0bd}
+#viewport.is-resizing-frame,#viewport.is-resizing-frame *{cursor:var(--frame-cursor)!important;user-select:none}
+#viewport.is-resizing-frame .canvas-caption{opacity:0}
+@media(pointer:coarse){#canvas-frame-controls .canvas-frame-handle span{width:12px;height:12px}}
+@media(forced-colors:active){#canvas-frame-controls .canvas-frame-handle span{background:Canvas;border-color:Highlight}.canvas-frame-outline{border-color:Highlight}.canvas-frame-readout{background:Canvas;color:CanvasText;border-color:CanvasText}}

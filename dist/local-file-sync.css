@@ -1,0 +1,11 @@
+.local-file-sync{margin-top:9px;padding:8px 9px;border:1px solid var(--lg-border,#3b434e);border-radius:10px;background:var(--lg-surface-raised,#252d37);font-size:10px;line-height:1.5;color:var(--lg-ink,#ced5df)}
+.local-file-sync>div{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.local-file-sync label{display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+.local-file-sync input{width:12px;height:12px;margin:0;accent-color:var(--lg-accent,#dc9568)}
+.local-file-sync label:has(input:disabled){opacity:.65;cursor:default}
+#local-file-sync button{font-size:9px;padding:2px 4px;border:0;border-radius:4px;color:var(--lg-accent,#f3b37c)}
+.local-file-sync p{font-size:9px;color:var(--lg-muted,#9da8b5);margin:4px 0 0;overflow-wrap:anywhere;line-height:1.5;max-height:4.5em;overflow:auto}
+.local-file-sync[data-phase=synced] p{color:var(--lg-positive,#559d83)}
+.local-file-sync[data-phase=error] p{color:var(--lg-danger,#ce6b5a)}
+.local-file-sync[data-phase=syncing] p{color:var(--lg-accent,#f3b37c)}
+@media(max-width:900px){.local-file-sync{padding:6px}.local-file-sync>div{flex-wrap:wrap}.local-file-sync label{font-size:9px}}

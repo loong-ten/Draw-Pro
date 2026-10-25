@@ -2,7 +2,7 @@ import { PaintDocument, makeCanvas, composite } from './core.js';
 import { normalizeBlend } from './core.js';
 
 // All image and project data stays in the browser. A directory is written only
-// after the user explicitly opens it and invokes one of the save functions.
+// after the user opens a writable directory and saves or enables local sync.
 const IMAGE_EXTENSIONS = /\.(?:png|jpe?g|webp|gif|bmp|svg|avif)$/i;
 const MAX_IMAGE_PIXELS = 32 * 1024 * 1024;
 const MAX_WORKSPACE_LAYER_PIXELS = 128 * 1024 * 1024;
@@ -264,13 +264,17 @@ export async function encodeDocument(doc, format = 'png', quality = 0.92) {
   format = normalizeFormat(format);
   if (!MIME_TYPES[format]) throw userError('保存格式须为 PNG、JPEG、WebP、BMP 或 GIF。', 'UNSUPPORTED_FORMAT');
   dimensionCheck(doc.width, doc.height);
+  // composite() creates a detached visible-image snapshot synchronously before
+  // this function first yields. Later edits cannot alter the bytes being encoded.
   const canvas = composite(doc, { background: format === 'jpeg' || format === 'bmp' ? '#ffffff' : null });
-  if (format === 'bmp') return encodeBitmap(canvas);
-  if (format === 'gif') return encodeGif(canvas);
-  const blob = await canvasToBlob(canvas, MIME_TYPES[format], Math.min(1, Math.max(0.05, Number(quality) || 0.92)));
-  // HTMLCanvasElement can silently fall back to PNG for unsupported encoders.
-  if (blob.type !== MIME_TYPES[format]) throw userError(`当前浏览器不支持 ${format.toUpperCase()} 编码，请选择 PNG。`, 'UNSUPPORTED_FORMAT');
-  return blob;
+  try {
+    if (format === 'bmp') return encodeBitmap(canvas);
+    if (format === 'gif') return encodeGif(canvas);
+    const blob = await canvasToBlob(canvas, MIME_TYPES[format], Math.min(1, Math.max(0.05, Number(quality) || 0.92)));
+    // HTMLCanvasElement can silently fall back to PNG for unsupported encoders.
+    if (blob.type !== MIME_TYPES[format]) throw userError(`当前浏览器不支持 ${format.toUpperCase()} 编码，请选择 PNG。`, 'UNSUPPORTED_FORMAT');
+    return blob;
+  } finally { canvas.width = canvas.height = 1; }
 }
 
 export function downloadBlob(blob, filename) {
@@ -345,33 +349,149 @@ async function writeBlob(handle, blob) {
   }
 }
 
-async function unusedFile(directory, name) {
-  const stem = name.replace(/\.[^.]+$/, '');
-  const extension = name.slice(stem.length);
-  for (let index = 0; index < 10_000; index++) {
-    const candidate = index ? `${stem} (${index})${extension}` : name;
-    try {
-      await directory.getFileHandle(candidate, { create: false });
-    } catch (error) {
-      if (error?.name === 'NotFoundError') return { handle: await directory.getFileHandle(candidate, { create: true }), name: candidate };
-      // A directory with this name is also a collision, not a writable image.
-      if (error?.name !== 'TypeMismatchError') throw error;
-    }
-  }
-  throw userError('同名文件过多，请改用“另存为”。', 'NAME_COLLISION');
+const fileCreationQueues = new WeakMap();
+
+function assertSaveReady(canWrite) {
+  if (canWrite && !canWrite()) throw userError('素材仍在编辑中，请结束当前操作后再保存。', 'SYNC_BUSY');
 }
 
-function recordSave(doc, name, handle, savedRevision) {
-  doc.name = name;
-  if (doc.revision === savedRevision) doc.dirty = false;
-  if (handle) doc.fileHandle = handle;
+function assertSaveCurrent(isCurrent) {
+  if (isCurrent && !isCurrent()) throw userError('工作区或目标目录已切换，已停止此写入。', 'SYNC_CANCELLED');
+}
+
+// Serialize name reservation within each directory. Two newly created documents
+// named alike must not both claim the same getFileHandle({create:true}) result.
+async function unusedFile(directory, name, { isCurrent = null } = {}) {
+  const previous = fileCreationQueues.get(directory) || Promise.resolve();
+  const reservation = previous.catch(() => {}).then(async () => {
+    const stem = name.replace(/\.[^.]+$/, '');
+    const extension = name.slice(stem.length);
+    for (let index = 0; index < 10_000; index++) {
+      assertSaveCurrent(isCurrent);
+      const candidate = index ? stem + ' (' + index + ')' + extension : name;
+      try {
+        await directory.getFileHandle(candidate, { create: false });
+      } catch (error) {
+        if (error?.name === 'NotFoundError') {
+          assertSaveCurrent(isCurrent);
+          return { handle: await directory.getFileHandle(candidate, { create: true }), name: candidate };
+        }
+        // A directory with this name is also a collision, not a writable image.
+        if (error?.name !== 'TypeMismatchError') throw error;
+      }
+    }
+    throw userError('同名文件过多，请改用“另存为”。', 'NAME_COLLISION');
+  });
+  const tail = reservation.catch(() => {});
+  fileCreationQueues.set(directory, tail);
+  try { return await reservation; }
+  finally { if (fileCreationQueues.get(directory) === tail) fileCreationQueues.delete(directory); }
+}
+
+function saveSnapshot(doc) {
+  return {
+    revision: doc.revision, width: doc.width, height: doc.height, name: doc.name,
+    fileHandle: doc.fileHandle, path: doc.path,
+    layers: doc.layers.map(layer => ({
+      layer, canvas: layer.canvas, id: layer.id, name: layer.name, visible: layer.visible,
+      opacity: layer.opacity, locked: layer.locked, blend: layer.blend,
+    })),
+  };
+}
+
+function saveSnapshotMatches(doc, snapshot) {
+  return doc.revision === snapshot.revision && doc.width === snapshot.width && doc.height === snapshot.height &&
+    doc.name === snapshot.name && doc.layers.length === snapshot.layers.length &&
+    snapshot.layers.every((saved, index) => {
+      const layer = doc.layers[index];
+      return layer === saved.layer && layer.canvas === saved.canvas &&
+        ['id', 'name', 'visible', 'opacity', 'locked', 'blend'].every(key => layer[key] === saved[key]);
+    });
+}
+
+function recordSave(doc, name, handle, snapshot, canClean = true) {
+  const clean = canClean && saveSnapshotMatches(doc, snapshot);
+  if (doc.name === snapshot.name) doc.name = name;
+  if (clean) doc.dirty = false;
+  if (handle && doc.fileHandle === snapshot.fileHandle) doc.fileHandle = handle;
+  return clean;
+}
+
+async function requireGrantedWrite(handle, label) {
+  if (!handle || typeof handle.queryPermission !== 'function') {
+    throw userError(label + '无法确认已有写入权限，请点击“重试同步”重新授权；或先保存工程后重新打开目录。', 'PERMISSION_UNAVAILABLE');
+  }
+  // No background requestPermission: a fresh user gesture must restore the grant.
+  if (await handle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+    throw userError(label + '写入权限已失效，请点击“重试同步”重新授权；或先保存工程后重新打开目录。', 'PERMISSION_DENIED');
+  }
+}
+
+/**
+ * File-only background write into an already granted native directory.
+ * No permission prompts, native pickers, downloads or fallback paths occur here.
+ * A source handle is reused only when directory.resolve() proves containment.
+ */
+export async function writeDocumentFile(doc, {
+  directory, quality = 0.92, isCurrent = () => true, canWrite = () => true, canClean = () => true,
+} = {}) {
+  if (directory?.kind !== 'directory' || typeof directory.getFileHandle !== 'function') {
+    throw userError('请先打开可直接读写的本地工作目录。', 'NO_WRITABLE_DIRECTORY');
+  }
+  assertSaveCurrent(isCurrent);
+  await requireGrantedWrite(directory, '工作目录');
+  assertSaveCurrent(isCurrent);
+  assertSaveReady(canWrite);
+  const snapshot = saveSnapshot(doc);
+  const inferred = fileFormat(snapshot.name);
+  const format = MIME_TYPES[inferred] ? inferred : 'png';
+  let name = withExtension(snapshot.name || '未命名.png', format);
+  const blob = await encodeDocument(doc, format, quality);
+  assertSaveCurrent(isCurrent);
+  await requireGrantedWrite(directory, '工作目录');
+  assertSaveCurrent(isCurrent);
+
+  let handle = null, relativeName = null;
+  if (snapshot.fileHandle && fileFormat(snapshot.fileHandle.name || snapshot.name) === format &&
+      typeof directory.resolve === 'function') {
+    const relativePath = await directory.resolve(snapshot.fileHandle);
+    assertSaveCurrent(isCurrent);
+    if (Array.isArray(relativePath) && relativePath.length > 0) {
+      handle = snapshot.fileHandle; name = handle.name || name; relativeName = relativePath.join('/');
+    }
+  }
+  if (!handle) {
+    const target = await unusedFile(directory, name, { isCurrent });
+    handle = target.handle; name = target.name; relativeName = name;
+  }
+  await requireGrantedWrite(handle, '目标文件');
+  assertSaveCurrent(isCurrent);
+  if (typeof handle.createWritable !== 'function') throw userError('目标文件不支持直接写入。', 'PERMISSION_UNAVAILABLE');
+  const writable = await handle.createWritable();
+  try {
+    assertSaveCurrent(isCurrent);
+    await writable.write(blob);
+    assertSaveCurrent(isCurrent);
+    await writable.close();
+  } catch (error) {
+    try { await writable.abort(); } catch { /* Preserve the actual write error. */ }
+    throw error;
+  }
+  const current = isCurrent();
+  const clean = current ? recordSave(doc, name, handle, snapshot, !!canClean()) : false;
+  if (current && doc.fileHandle === handle && doc.path === snapshot.path) doc.path = relativeName || name;
+  return {
+    method: 'file', name, size: blob.size, format, savedRevision: snapshot.revision,
+    clean, stale: !current, handle,
+  };
 }
 
 /**
  * Returns method:'download' if the browser cannot write directly. A cancelled
  * native picker throws AbortError instead of starting an unexpected download.
  */
-export async function saveDocument(doc, { format = null, quality = 0.92, saveAs = false, directory = null, filename = null } = {}) {
+export async function saveDocument(doc, { format = null, quality = 0.92, saveAs = false, directory = null, filename = null, isCurrent = () => true, canWrite = () => true, canClean = () => true } = {}) {
+  assertSaveCurrent(isCurrent);
   const inferred = fileFormat(filename || doc.name);
   format = normalizeFormat(format || (MIME_TYPES[inferred] ? inferred : 'png'));
   if (!MIME_TYPES[format]) throw userError('保存格式须为 PNG、JPEG、WebP、BMP 或 GIF。', 'UNSUPPORTED_FORMAT');
@@ -418,22 +538,26 @@ export async function saveDocument(doc, { format = null, quality = 0.92, saveAs 
       handle = null;
     }
   }
-  const savedRevision = doc.revision;
+  assertSaveCurrent(isCurrent);
+  assertSaveReady(canWrite);
+  const savedSnapshot = saveSnapshot(doc);
   const blob = await encodeDocument(doc, format, quality);
+  assertSaveCurrent(isCurrent);
   if (handle) {
     try {
       await writeBlob(handle, blob);
-      recordSave(doc, name, handle, savedRevision);
+      if (isCurrent()) recordSave(doc, name, handle, savedSnapshot, !!canClean());
       return { method: 'file', name, size: blob.size, format };
     } catch (error) {
       if (isAbort(error)) throw error;
       fallbackReason = error?.message || '写入失败，已转为下载。';
     }
   }
+  assertSaveCurrent(isCurrent);
   downloadBlob(blob, name);
   // A download is a new copy; never retain a handle pointing at a different file.
-  if (saveAs || doc.fileHandle && fileFormat(doc.fileHandle.name) !== format) doc.fileHandle = null;
-  recordSave(doc, name, null, savedRevision);
+  if (doc.fileHandle === savedSnapshot.fileHandle && (saveAs || doc.fileHandle && fileFormat(doc.fileHandle.name) !== format)) doc.fileHandle = null;
+  recordSave(doc, name, null, savedSnapshot, !!canClean());
   return { method: 'download', name, size: blob.size, format, fallbackReason };
 }
 

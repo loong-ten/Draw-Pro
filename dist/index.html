@@ -7,7 +7,7 @@
   <script src="./liquid-theme-init.js"></script>
   <title>画境 Pro · 专业像素绘画工作台</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./composer.css"><link rel="stylesheet" href="./composition-slots.css"><link rel="stylesheet" href="./optimizer.css"><link rel="stylesheet" href="./inspections.css"><link rel="stylesheet" href="./workbench.css"><link rel="stylesheet" href="./padding.css"><link rel="stylesheet" href="./tile-canvas.css"><link rel="stylesheet" href="./slicer.css"><link rel="stylesheet" href="./converter.css"><link rel="stylesheet" href="./region-capture.css">
   <link rel="stylesheet" href="./mode-order.css">
-  <link rel="stylesheet" href="./liquid-glass.css"><link rel="stylesheet" href="./liquid-modes.css">
+  <link rel="stylesheet" href="./liquid-glass.css"><link rel="stylesheet" href="./liquid-modes.css"><link rel="stylesheet" href="./canvas-frame.css"><link rel="stylesheet" href="./local-file-sync.css">
 </head>
 <body data-mode="paint">
   <header class="topbar" data-lg-light>
@@ -45,6 +45,7 @@
     <aside class="assets-panel">
       <div class="panel-heading"><h2><i data-icon="folder"></i>素材工作区</h2><button class="icon-button" data-action="new" title="新建画布 Ctrl+N" aria-label="新建画布"><i data-icon="plus"></i></button></div>
       <button id="directory-button" class="directory-box" data-action="folder"><i data-icon="folderOpen"></i><span><strong id="directory-name">我的创作空间</strong><small id="directory-detail">选择文件夹，开始创作</small></span><i data-icon="chevronDown" class="tiny"></i></button>
+      <div id="local-file-sync" class="local-file-sync" data-phase="disconnected"><div><label title="编辑后自动合成可见图层并写回已授权目录。分层内容请另存工作区工程。"><input id="local-sync-enabled" type="checkbox" checked disabled><span>自动同步本地</span></label><button id="local-sync-now" type="button" hidden>立即同步</button></div><p id="local-sync-status" role="status" aria-live="polite">仅浏览器草稿 · 未连接可写目录</p></div>
       <div class="asset-controls"><span>素材 <b id="asset-count">1</b></span><div><button class="icon-button" id="asset-view" title="切换素材列表" aria-label="切换素材列表"><i data-icon="grid"></i></button><button class="icon-button" data-action="open" title="导入图片" aria-label="导入图片"><i data-icon="plus"></i></button></div></div>
       <div class="asset-search"><i data-icon="search"></i><input id="asset-search" placeholder="搜索素材…" aria-label="搜索素材"></div>
       <div id="asset-list" class="asset-list" aria-label="图片素材列表"></div>
@@ -68,8 +69,8 @@
        <button data-tool="hand" title="平移 H" aria-label="平移画布"><i data-icon="hand"></i></button>
       </div><div class="canvas-stack">
       <section id="capture-panel" class="capture-panel" aria-label="区域截图设置" hidden></section>
-      <div id="viewport" tabindex="0" aria-label="画布编辑区域"><canvas id="board" tabindex="0" aria-label="绘图画布"></canvas><div class="canvas-caption"><span id="canvas-file-caption">山野之间.png</span><span id="canvas-size-caption">960 × 640 px</span></div><div id="drop-overlay"><i data-icon="upload"></i><strong>放下图片，加入工作区</strong><span>支持多张图片与画境 / 拼境 / Pixelroom 工程</span></div><div id="text-editor-box" hidden><textarea id="text-editor" placeholder="输入文字…" aria-label="输入画布文字"></textarea><div><button id="text-cancel">取消</button><button id="text-apply">放置文字 ↵</button></div></div></div>
-      <div class="editor-bottom"><span><i data-icon="mouse"></i><span id="interaction-hint">按住空格平移 · 滚轮缩放</span></span><button data-action="fit"><i data-icon="fit"></i>适应窗口</button><button data-action="actual">1:1</button></div></div></div>
+      <div id="viewport" tabindex="0" aria-label="画布编辑区域"><canvas id="board" tabindex="0" aria-label="绘图画布"></canvas><div id="canvas-frame-controls" aria-label="画幅边界调整" hidden></div><div class="canvas-caption"><span id="canvas-file-caption">山野之间.png</span><span id="canvas-size-caption">960 × 640 px</span></div><div id="drop-overlay"><i data-icon="upload"></i><strong>放下图片，加入工作区</strong><span>支持多张图片与画境 / 拼境 / Pixelroom 工程</span></div><div id="text-editor-box" hidden><textarea id="text-editor" placeholder="输入文字…" aria-label="输入画布文字"></textarea><div><button id="text-cancel">取消</button><button id="text-apply">放置文字 ↵</button></div></div></div>
+      <div class="editor-bottom"><span><i data-icon="mouse"></i><span id="interaction-hint">拖动边框调整画幅 · 空格平移 · 滚轮缩放</span></span><button data-action="fit"><i data-icon="fit"></i>适应窗口</button><button data-action="actual">1:1</button></div></div></div>
       <div id="composer-host" class="mode-host" hidden></div><div id="tile-canvas-host" class="mode-host" hidden></div><div id="slicer-host" class="mode-host" hidden></div><div id="optimizer-host" class="mode-host" hidden></div><div id="padding-host" class="mode-host" hidden></div>
     </section>
     <aside class="inspector-panel">
