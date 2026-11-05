@@ -1,0 +1,2 @@
+dist/start.bat text eol=crlf
+dist/start.sh text eol=lf
